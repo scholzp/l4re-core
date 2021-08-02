@@ -14,6 +14,7 @@ DIR_arm64 := aarch64
 DIR_ppc32 := powerpc
 DIR_sparc := sparc
 DIR_mips  := mips
+DIR_riscv := riscv
 
 
 vpath %.c $(CON_DIR)/ldso/libdl
@@ -44,6 +45,7 @@ DEFINES_amd64-l4f += -DUSE_TLS=1 -DUSE___THREAD=1
 DEFINES_arm-l4f   += -DUSE_TLS=1 -DUSE___THREAD=1
 DEFINES_arm64-l4f += -DUSE_TLS=1 -DUSE___THREAD=1
 DEFINES_mips-l4f  += -DUSE_TLS=1 -DUSE___THREAD=1
+DEFINES_riscv-l4f += -DUSE_TLS=1 -DUSE___THREAD=1
 
 LDFLAGS = -lld-l4
 #LDFLAGS  =  -fini dl_cleanup
