@@ -75,22 +75,6 @@ typedef struct _pthread_rwlock_info {
 # define TCB_ALIGNMENT	sizeof (double)
 #endif
 
-
-/* We keep thread specific data in a special data structure, a two-level
-   array.  The top-level array contains pointers to dynamically allocated
-   arrays of a certain number of data pointers.  So we can implement a
-   sparse array.  Each dynamic second-level array has
-        PTHREAD_KEY_2NDLEVEL_SIZE
-   entries.  This value shouldn't be too large.  */
-#define PTHREAD_KEY_2NDLEVEL_SIZE       32
-
-/* We need to address PTHREAD_KEYS_MAX key with PTHREAD_KEY_2NDLEVEL_SIZE
-   keys in each subarray.  */
-#define PTHREAD_KEY_1STLEVEL_SIZE \
-  ((PTHREAD_KEYS_MAX + PTHREAD_KEY_2NDLEVEL_SIZE - 1) \
-   / PTHREAD_KEY_2NDLEVEL_SIZE)
-
-
 union dtv;
 
 struct pthread
@@ -146,7 +130,7 @@ struct pthread
   char p_canceltype;            /* cancellation type (deferred/async) */
   char p_canceled;              /* cancellation request pending */
   struct pthread_start_args p_start_args; /* arguments for thread creation */
-  void ** p_specific[PTHREAD_KEY_1STLEVEL_SIZE]; /* thread-specific data */
+  void * p_specific[PTHREAD_KEYS_MAX];    /* thread-specific data */
 #if !(USE_TLS && HAVE___THREAD)
   void * p_libc_specific[_LIBC_TSD_KEY_N]; /* thread-specific data for libc */
   int * p_errnop;               /* pointer to used errno variable */

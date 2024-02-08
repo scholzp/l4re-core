@@ -24,6 +24,8 @@
 #include <bits/libc-lock.h>
 
 #include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
 
 /* Table of keys. */
 
@@ -32,7 +34,7 @@ static struct pthread_key_struct pthread_keys[PTHREAD_KEYS_MAX] =
 
 /* For debugging purposes put the maximum number of keys in a variable.  */
 const int __linuxthreads_pthread_keys_max = PTHREAD_KEYS_MAX;
-const int __linuxthreads_pthread_key_2ndlevel_size = PTHREAD_KEY_2NDLEVEL_SIZE;
+const int __linuxthreads_pthread_key_2ndlevel_size = 0;
 
 /* Mutex to protect access to pthread_keys */
 
@@ -67,25 +69,24 @@ strong_alias (__pthread_key_create, pthread_key_create)
 
 struct pthread_key_delete_helper_args {
   /* Damn, we need lexical closures in C! ;) */
-  unsigned int idx1st, idx2nd;
+  unsigned int idx;
   pthread_descr self;
 };
 
 static void pthread_key_delete_helper(void *arg, pthread_descr th)
 {
   struct pthread_key_delete_helper_args *args = arg;
-  unsigned int idx1st = args->idx1st;
-  unsigned int idx2nd = args->idx2nd;
+  unsigned int idx   = args->idx;
   pthread_descr self = args->self;
 
   if (self == 0)
     self = args->self = thread_self();
 
   if (!th->p_terminated) {
-    /* pthread_exit() may try to free th->p_specific[idx1st] concurrently. */
+    /* pthread_exit() may try to free th->p_specific[idx] concurrently. */
     __pthread_lock(th->p_lock, self);
-    if (th->p_specific[idx1st] != NULL)
-      th->p_specific[idx1st][idx2nd] = NULL;
+    if (th->p_specific[idx] != NULL)
+      th->p_specific[idx] = NULL;
     __pthread_unlock(th->p_lock);
   }
 }
@@ -101,7 +102,7 @@ int pthread_key_delete(pthread_key_t key)
     return EINVAL;
   }
   pthread_keys[key].in_use = 0;
-  pthread_keys[key].destr = NULL;
+  pthread_keys[key].destr  = NULL;
 
   /* Set the value of the key to NULL in all running threads, so
      that if the key is reallocated later by pthread_key_create, its
@@ -111,8 +112,7 @@ int pthread_key_delete(pthread_key_t key)
      it just in the current thread.  */
 
   struct pthread_key_delete_helper_args args;
-  args.idx1st = key / PTHREAD_KEY_2NDLEVEL_SIZE;
-  args.idx2nd = key % PTHREAD_KEY_2NDLEVEL_SIZE;
+  args.idx = key;
   if (!l4_is_invalid_cap(__pthread_manager_request)
       && !(__builtin_expect (__pthread_exit_requested, 0)))
     {
@@ -134,8 +134,8 @@ int pthread_key_delete(pthread_key_t key)
     }
   else
     {
-      if (self->p_specific[args.idx1st] != NULL)
-	self->p_specific[args.idx1st][args.idx2nd] = NULL;
+      if (self->p_specific[args.idx] != NULL)
+        self->p_specific[args.idx] = NULL;
     }
 
   pthread_mutex_unlock(&pthread_keys_mutex);
@@ -149,19 +149,11 @@ attribute_hidden
 __pthread_setspecific(pthread_key_t key, const void * pointer)
 {
   pthread_descr self = thread_self();
-  unsigned int idx1st, idx2nd;
 
   if (key >= PTHREAD_KEYS_MAX || !pthread_keys[key].in_use)
     return EINVAL;
-  idx1st = key / PTHREAD_KEY_2NDLEVEL_SIZE;
-  idx2nd = key % PTHREAD_KEY_2NDLEVEL_SIZE;
-  if (THREAD_GETMEM_NC(self, p_specific, idx1st) == NULL) {
-    void *newp = calloc(PTHREAD_KEY_2NDLEVEL_SIZE, sizeof (void *));
-    if (newp == NULL)
-      return ENOMEM;
-    THREAD_SETMEM_NC(self, p_specific ,idx1st, newp);
-  }
-  THREAD_GETMEM_NC(self, p_specific, idx1st)[idx2nd] = (void *) pointer;
+  
+  THREAD_SETMEM_NC(self, p_specific, key, (void *) pointer);
   return 0;
 }
 strong_alias (__pthread_setspecific, pthread_setspecific)
@@ -173,16 +165,11 @@ void *
 __pthread_getspecific(pthread_key_t key)
 {
   pthread_descr self = thread_self();
-  unsigned int idx1st, idx2nd;
 
-  if (key >= PTHREAD_KEYS_MAX)
+  if (key >= PTHREAD_KEYS_MAX || !pthread_keys[key].in_use)
     return NULL;
-  idx1st = key / PTHREAD_KEY_2NDLEVEL_SIZE;
-  idx2nd = key % PTHREAD_KEY_2NDLEVEL_SIZE;
-  if (THREAD_GETMEM_NC(self, p_specific, idx1st) == NULL
-      || !pthread_keys[key].in_use)
-    return NULL;
-  return THREAD_GETMEM_NC(self, p_specific, idx1st)[idx2nd];
+  
+  return THREAD_GETMEM_NC(self, p_specific, key);
 }
 strong_alias (__pthread_getspecific, pthread_getspecific)
 
@@ -193,7 +180,7 @@ attribute_hidden
 __pthread_destroy_specifics(void)
 {
   pthread_descr self = thread_self();
-  int i, j, round, found_nonzero;
+  int i, round, found_nonzero;
   destr_function destr;
   void * data;
 
@@ -201,27 +188,16 @@ __pthread_destroy_specifics(void)
        found_nonzero && round < PTHREAD_DESTRUCTOR_ITERATIONS;
        round++) {
     found_nonzero = 0;
-    for (i = 0; i < PTHREAD_KEY_1STLEVEL_SIZE; i++)
-      if (THREAD_GETMEM_NC(self, p_specific, i) != NULL)
-        for (j = 0; j < PTHREAD_KEY_2NDLEVEL_SIZE; j++) {
-          destr = pthread_keys[i * PTHREAD_KEY_2NDLEVEL_SIZE + j].destr;
-          data = THREAD_GETMEM_NC(self, p_specific, i)[j];
-          if (destr != NULL && data != NULL) {
-            THREAD_GETMEM_NC(self, p_specific, i)[j] = NULL;
-            destr(data);
-            found_nonzero = 1;
-          }
-        }
-  }
-  __pthread_lock(THREAD_GETMEM(self, p_lock), self);
-  for (i = 0; i < PTHREAD_KEY_1STLEVEL_SIZE; i++) {
-    if (THREAD_GETMEM_NC(self, p_specific, i) != NULL) {
-      void *p = THREAD_GETMEM_NC(self, p_specific, i);
-      THREAD_SETMEM_NC(self, p_specific, i, NULL);
-      free(p);
+    for (i = 0; i < PTHREAD_KEYS_MAX; i++) {
+      destr = pthread_keys[i].destr;
+      data  = THREAD_GETMEM_NC(self, p_specific, i);
+      if (destr != NULL && data != NULL) {
+        THREAD_SETMEM_NC(self, p_specific, i, NULL);
+        destr(data);
+        found_nonzero = 1;
+      }
     }
   }
-  __pthread_unlock(THREAD_GETMEM(self, p_lock));
 }
 
 #if !(USE_TLS && HAVE___THREAD)
