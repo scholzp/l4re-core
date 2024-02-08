@@ -38,7 +38,7 @@ public:
 
 class Region_map
 : public L4Re::Util::Region_map<Region_handler, cxx::New_allocator>,
-  public L4Re::Util::Rm_server<Region_map, Dbg>
+  public L4Re::Util::Rm_server<Region_map, Dbg, Err>
 {
 private:
   typedef L4Re::Util::Region_map<Region_handler, cxx::New_allocator> Base;

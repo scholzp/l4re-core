@@ -28,7 +28,7 @@
 
 namespace L4Re { namespace Util {
 
-template<typename DERIVED, typename Dbg>
+template<typename DERIVED, typename Dbg, typename Err>
 struct Rm_server
 {
 private:
@@ -235,25 +235,25 @@ public:
 
     if (!n || !n->second.memory())
       {
-        Dbg(Dbg::Warn, "rm").printf("unhandled %s page fault at 0x%lx pc=0x%lx\n",
-                                    need_w ? "write" :
-                                    need_x ? "instruction" : "read", addr, pc);
+        Err(Err::Normal, "rm").printf("unhandled %s page fault at 0x%lx pc=0x%lx\n",
+                                       need_w ? "write" :
+                                       need_x ? "instruction" : "read", addr, pc);
         // generate exception
         return -L4_ENOMEM;
       }
 
     if (!(n->second.flags() & L4Re::Rm::F::W) && need_w)
       {
-        Dbg(Dbg::Warn, "rm").printf("write page fault in readonly region at 0x%lx pc=0x%lx\n",
-                                    addr, pc);
+        Err(Err::Normal, "rm").printf("write page fault in readonly region at 0x%lx pc=0x%lx\n",
+                                       addr, pc);
         // generate exception
         return -L4_EACCESS;
       }
 
     if (!(n->second.flags() & L4Re::Rm::F::X) && need_x)
       {
-        Dbg(Dbg::Warn, "rm").printf("instruction page fault in non-exec region at 0x%lx pc=0x%lx\n",
-                                    addr, pc);
+        Err(Err::Normal, "rm").printf("instruction page fault in non-exec region at 0x%lx pc=0x%lx\n",
+                                       addr, pc);
         // generate exception
         return -L4_EACCESS;
       }
@@ -261,8 +261,8 @@ public:
     typename DERIVED::Region_handler::Ops::Map_result map_res;
     if (int err = n->second.map(addr, n->first, need_w, &map_res))
       {
-        Dbg(Dbg::Warn, "rm").printf("mapping for page fault failed with error %d at 0x%lx pc=0x%lx\n",
-                                    err, addr, pc);
+        Err(Err::Normal, "rm").printf("mapping for page fault failed with error %d at 0x%lx pc=0x%lx\n",
+                                       err, addr, pc);
         // generate exception
         return -L4_ENOMEM;
       }

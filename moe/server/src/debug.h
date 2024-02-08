@@ -16,6 +16,9 @@ class Err : public L4Re::Util::Err
 public:
   explicit
   Err(Level l = Normal) : L4Re::Util::Err(l, "MOE") {}
+
+  explicit
+  Err(Level l, char const *comp) : L4Re::Util::Err(l, comp) {}
 };
 
 class Dbg : public L4Re::Util::Dbg

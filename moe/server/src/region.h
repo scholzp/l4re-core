@@ -38,7 +38,7 @@ public:
 class Region_map
 : public L4Re::Util::Region_map<Region_handler, Moe::Quota_allocator>,
   public L4::Epiface_t<Region_map, L4Re::Rm, Moe::Server_object>,
-  public L4Re::Util::Rm_server<Region_map, Dbg>,
+  public L4Re::Util::Rm_server<Region_map, Dbg, Err>,
   public Moe::Q_object
 {
 private:
