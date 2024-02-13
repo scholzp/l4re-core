@@ -1,13 +1,12 @@
 PKGDIR	?= ..
 L4DIR	?= $(PKGDIR)/../../..
 
+include $(PKGDIR)/../uclibc/pthread.mk
 
-ifeq ($(CONFIG_UCLIBC_STOCK),y)
-TARGET += libpthread
-else ifeq ($(CONFIG_UCLIBC_STOCK_TRACING),y)
-TARGET += libpthread_perftrace
+ifeq ($(CONFIG_UCLIBC_STOCK_TRACING),y)
+TARGET += $(PTH_W_TRACES)
 else
-TARGET += libpthread
+TARGET += $(PTH_STOCK)
 endif
 TARGET += uclibc minimal_l4re
 

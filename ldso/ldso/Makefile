@@ -1,8 +1,9 @@
 PKGDIR ?= ..
 L4DIR  ?= $(PKGDIR)/../../..
 
+include $(PKGDIR)/../uclibc/pthread.mk
+
 CON_DIR := $(PKGDIR)/../uclibc/lib/contrib/uclibc/ldso
-PTH_DIR := $(PKGDIR)/../uclibc/lib/libpthread
 UCC_DIR := $(PKGDIR)/../uclibc/lib/uclibc
 
 PC_EXTRA = Link_DynLinker= rom/libld-l4.so

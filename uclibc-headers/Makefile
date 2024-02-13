@@ -6,6 +6,7 @@ LIBCSRC_DIR = $(PKGDIR)/../uclibc/lib/uclibc
 all:: include
 
 include $(LIBCSRC_DIR)/make_vars.mk
+include $(PKGDIR)/../uclibc/pthread.mk
 
 HEADERS_LST := $(LIBCSRC_DIR_ABS)/target_headers.lst
 DST_HEADERS := $(shell cat $(HEADERS_LST))

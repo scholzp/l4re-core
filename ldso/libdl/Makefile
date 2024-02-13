@@ -4,7 +4,8 @@ L4DIR  ?= $(PKGDIR)/../../..
 PC_FILENAME := libdl
 
 CON_DIR := $(PKGDIR)/../uclibc/lib/contrib/uclibc
-PTH_DIR := $(PKGDIR)/../uclibc/lib/libpthread
+# PTH_DIR := $(PKGDIR)/../uclibc/lib/libpthread2
+include $(PKGDIR)/../uclibc/pthread.mk
 
 DIR_amd64 := x86_64
 DIR_x86   := i386

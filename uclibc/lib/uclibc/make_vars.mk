@@ -15,11 +15,11 @@ LIBC_DST_DIR  := $(OBJ_DIR)/src
 PTHOBJ_PFX    := libpthread/src
 
 # pthread source file directory
-PTHLIB_DIR    := $(LIBCSRC_DIR_ABS)/../libpthread
+include $(PKGDIR)/../uclibc/pthread.mk
 
 # include directory for pthread internals
-PTHREAD_INCDIR = $(PTHLIB_DIR)/src/sysdeps/$(UCLIBC_ARCH_$(ARCH)) \
-                 $(PTHLIB_DIR)/src
+PTHREAD_INCDIR = $(PTH_DIR)/src/sysdeps/$(UCLIBC_ARCH_$(ARCH)) \
+                 $(PTH_DIR)/src
 
 # include dir for accessing ldso internals
 LDSO_INC = -I$(CONTRIB_DIR)/ldso/ldso/$(UCLIBC_ARCH) -I$(CONTRIB_DIR)/ldso/include
