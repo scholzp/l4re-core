@@ -1,6 +1,7 @@
 PKGDIR ?= ..
 L4DIR  ?= $(PKGDIR)/../../..
 
+include $(L4DIR)/mk/Makeconf
 include $(PKGDIR)/../uclibc/pthread.mk
 
 CON_DIR := $(PKGDIR)/../uclibc/lib/contrib/uclibc/ldso
