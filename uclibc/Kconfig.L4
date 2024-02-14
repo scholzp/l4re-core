@@ -3,7 +3,6 @@ menu "pThread implementation"
 choice PTHREAD_BACKEND
     prompt "Backend implementation of pThread to use in C standard library"
     default UCLIBC_STOCK
-
     config UCLIBC_STOCK
         bool "L4Re standard (uclibc)"
     config UCLIBC_STOCK_TRACING
