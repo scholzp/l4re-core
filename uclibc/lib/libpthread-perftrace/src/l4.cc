@@ -17,12 +17,11 @@
 #include "spinlock.h"
 
 #include "l4.h"
-
 #include <stdio.h>
-
 
 l4_cap_idx_t pthread_l4_cap(pthread_t thread_id)
 {
+  printf("Test\n");
   __volatile__ pthread_descr self = thread_self();
   pthread_handle handle = thread_handle(thread_id);
   pthread_descr th;
@@ -65,7 +64,6 @@ void pthread_l4_for_each_thread(void (*fn)(pthread_t))
  */
 int __pthread_l4_initialize_main_thread(pthread_descr th)
 {
-  printf("Staring with addtidional debug output.");
   L4Re::Env *env = const_cast<L4Re::Env*>(L4Re::Env::env());
   if (!env)
     return -L4_ENODEV;

@@ -26,8 +26,8 @@
 #include "spinlock.h"
 #include "queue.h"
 #include "restart.h"
-#include <time.h>
 #include <stdio.h>
+#include <time.h>
 
 int
 attribute_hidden
@@ -39,7 +39,7 @@ __pthread_mutex_init(pthread_mutex_t * mutex,
     mutex_attr == NULL ? PTHREAD_MUTEX_TIMED_NP : mutex_attr->__mutexkind;
   mutex->__m_count = 0;
   mutex->__m_owner = NULL;
-  printf("mutex_init(): Time stamp %f\n", (double) time(NULL));
+  printf("Test from mutex_init %f\n", (double) time(NULL));
   return 0;
 }
 strong_alias (__pthread_mutex_init, pthread_mutex_init)
@@ -48,7 +48,6 @@ int
 attribute_hidden
 __pthread_mutex_destroy(pthread_mutex_t * mutex)
 {
-  printf("mutex_destroy(): Time stamp %f\n", (double) time(NULL));
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
   case PTHREAD_MUTEX_RECURSIVE_NP:
@@ -70,7 +69,6 @@ int
 attribute_hidden
 __pthread_mutex_trylock(pthread_mutex_t * mutex)
 {
-  printf("mutex_trylock(): Time stamp %f\n", (double) time(NULL));
   pthread_descr self;
   int retcode;
 
@@ -109,7 +107,6 @@ int
 attribute_hidden
 __pthread_mutex_lock(pthread_mutex_t * mutex)
 {
-  printf("mutex_lock(): Time stamp %f\n", (double) time(NULL));
   pthread_descr self;
 
   switch(mutex->__m_kind) {
@@ -151,7 +148,6 @@ __pthread_mutex_timedlock (pthread_mutex_t *mutex,
   pthread_descr self;
   int res;
 
-  printf("mutex_timedlock(): Time stamp %f\n", (double) time(NULL));
   if (__builtin_expect (abstime->tv_nsec, 0) < 0
       || __builtin_expect (abstime->tv_nsec, 0) >= 1000000000)
     return EINVAL;
@@ -194,7 +190,6 @@ int
 attribute_hidden
 __pthread_mutex_unlock(pthread_mutex_t * mutex)
 {
-  printf("mutex_unlock(): Time stamp %f\n", (double) time(NULL));
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
     __pthread_unlock(&mutex->__m_lock);
