@@ -10,7 +10,7 @@ include $(PKGDIR)/../uclibc/pthread.mk
 DIR_amd64 := x86_64
 DIR_x86   := i386
 DIR_arm   := arm
-DIR_arm64 := arm64
+DIR_arm64 := aarch64
 DIR_ppc32 := powerpc
 DIR_sparc := sparc
 DIR_mips  := mips
