@@ -1546,6 +1546,28 @@ void __l4_kill_thread(l4_cap_idx_t cap)
 }
 
 
+struct tracing_times pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE * PTHREAD_MAX_NUM_OF_THREADS];
+size_t pt_next_buffer_index = 0;
+
+size_t __pthread_get_buff_id(void) {
+  pt_next_buffer_index = (++pt_next_buffer_index) % PTHREAD_MAX_NUM_OF_THREADS;
+  return pt_next_buffer_index;
+}
+
+int pt_tracing_write_tracing_time(struct tracing_times* tt, pthread_descr desc) {
+  size_t offset = PTHREAD_TRACING_TIME_BUFFER_SIZE * desc->tracing_id;
+  pt_tracing_buffer[offset + desc->tracing_index].type = tt->type;
+  pt_tracing_buffer[offset + desc->tracing_index].time_stamp = tt->time_stamp;
+  desc->tracing_index = (++desc->tracing_index) % PTHREAD_TRACING_TIME_BUFFER_SIZE;
+  // if (0 == desc->tracing_index)
+  //   printf("Override!\n");
+  return 0;
+}
+
+// int __attribute__((visibility("default"))) pt_tracing_get_index(_pthread_descr desc) {
+//   return desc->tracing_index;
+// }
+
 /* Debugging aid */
 
 #ifdef DEBUG

@@ -12,6 +12,7 @@
 /* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the        */
 /* GNU Library General Public License for more details.                 */
 
+#include <pthread.h>
 #ifndef _DESCR_H
 #define _DESCR_H	1
 
@@ -159,6 +160,8 @@ struct pthread
   size_t p_alloca_cutoff;	/* Maximum size which should be allocated
 				   using alloca() instead of malloc().  */
   /* New elements must be added at the end.  */
+  size_t tracing_index;
+  size_t tracing_id;
 } __attribute__ ((aligned (TCB_ALIGNMENT)));
 
 
@@ -209,5 +212,7 @@ extern pthread_descr __pthread_find_self (void) __attribute__ ((pure));
 static __inline__ pthread_descr thread_self (void) __attribute__ ((pure));
 static __inline__ pthread_descr thread_self (void)
 { return (pthread_descr)(l4_utcb_tcr()->user[0]); }
+
+extern int pt_tracing_write_tracing_time(struct tracing_times* tt, pthread_descr desc);
 
 #endif	/* descr.h */

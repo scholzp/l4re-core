@@ -53,6 +53,8 @@ extern "C" {
 }
 
 #include <pthread-l4.h>
+#include <l4/sys/kip.h>
+#include <l4/util/rdtsc.h>
 
 #define USE_L4RE_FOR_STACK
 
@@ -139,6 +141,7 @@ __pthread_manager(void *arg)
   /* If we have special thread_self processing, initialize it.  */
 #ifdef INIT_THREAD_SELF
   INIT_THREAD_SELF(self, 1);
+  l4_calibrate_tsc(l4re_kip());
 #endif
 #if !(USE_TLS && HAVE___THREAD)
   /* Set the error variable.  */
@@ -824,6 +827,8 @@ static int pthread_handle_create(pthread_descr creator, const pthread_attr_t *at
 
   new_thread->p_sched_policy = creator->p_sched_policy;
   new_thread->p_priority = creator->p_priority;
+  new_thread->tracing_index = 0;
+  new_thread->tracing_id = __pthread_get_buff_id();  
 
   if (attr != NULL)
     {
