@@ -21,7 +21,6 @@
 
 l4_cap_idx_t pthread_l4_cap(pthread_t thread_id)
 {
-  printf("Test\n");
   __volatile__ pthread_descr self = thread_self();
   pthread_handle handle = thread_handle(thread_id);
   pthread_descr th;

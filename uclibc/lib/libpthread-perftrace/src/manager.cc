@@ -828,7 +828,12 @@ static int pthread_handle_create(pthread_descr creator, const pthread_attr_t *at
   new_thread->p_sched_policy = creator->p_sched_policy;
   new_thread->p_priority = creator->p_priority;
   new_thread->tracing_index = 0;
-  new_thread->tracing_id = __pthread_get_buff_id();  
+  new_thread->tracing_id = __pthread_get_buff_id();
+
+  pt_id_map[__pthread_get_mapping_id()] = {
+    new_thread->p_tid,
+    new_thread->tracing_id
+  };
 
   if (attr != NULL)
     {

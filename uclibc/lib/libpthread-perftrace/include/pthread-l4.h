@@ -35,6 +35,9 @@ inline l4_utcb_t *utcb(pthread_t t)
 inline int start(pthread_t thread, void *(*start_routine)(void *), void *arg)
 { return pthread_l4_start(thread, start_routine, arg); }
 
+// inline int pt_tracing_get_index(_pthread_descr desc) {
+//   return desc->tracing_index;
+// }
 
 }} // namespace L4, namespace Pthread
 

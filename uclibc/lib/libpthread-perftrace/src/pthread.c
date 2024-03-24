@@ -1547,11 +1547,19 @@ void __l4_kill_thread(l4_cap_idx_t cap)
 
 
 struct tracing_times pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE * PTHREAD_MAX_NUM_OF_THREADS];
+struct pt_id_mapping pt_id_map[PTHREAD_MAX_NUM_OF_THREADS];
+
 size_t pt_next_buffer_index = 0;
+size_t pt_next_id_mapping_index = 0;
 
 size_t __pthread_get_buff_id(void) {
   pt_next_buffer_index = (++pt_next_buffer_index) % PTHREAD_MAX_NUM_OF_THREADS;
   return pt_next_buffer_index;
+}
+
+size_t __pthread_get_mapping_id(void) {
+  pt_next_id_mapping_index = (++pt_next_id_mapping_index) % PTHREAD_MAX_NUM_OF_THREADS;
+  return pt_next_id_mapping_index;
 }
 
 int pt_tracing_write_tracing_time(struct tracing_times* tt, pthread_descr desc) {

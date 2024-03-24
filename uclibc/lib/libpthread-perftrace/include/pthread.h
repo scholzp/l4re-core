@@ -711,12 +711,23 @@ struct tracing_times {
   unsigned long long time_stamp;
 };
 
+struct pt_id_mapping {
+  pthread_t thread_id;
+  size_t buffer_index;
+};
+
 #define PTHREAD_TRACING_TIME_BUFFER_SIZE (1024 * 3)
 #define PTHREAD_MAX_NUM_OF_THREADS 32
 
 extern struct tracing_times pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE * PTHREAD_MAX_NUM_OF_THREADS];
+//extern struct pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE * PTHREAD_MAX_NUM_OF_THREADS];
+extern struct pt_id_mapping pt_id_map[PTHREAD_MAX_NUM_OF_THREADS];
 extern size_t pt_next_buffer_index;
+extern size_t pt_next_id_mapping_index;
 
 extern size_t __pthread_get_buff_id(void);
+extern size_t __pthread_get_mapping_id(void);
+
+// extern int pt_tracing_get_index(_pthread_descr desc);
 
 #endif	/* pthread.h */
