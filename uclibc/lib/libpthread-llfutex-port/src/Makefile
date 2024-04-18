@@ -19,7 +19,7 @@ DIR_mips  := mips
 DIR_ppc32 := powerpc
 DIR_sparc := sparc
 
-SRC_CC      = manager.cc l4.cc
+SRC_CC      = manager.cc l4.cc sema_init.cc 
 SRC_C      += spinlock.c mutex.c condvar.c rwlock.c errno.c specific.c \
               semaphore.c attr.c barrier.c join.c pthread.c \
               cancel.c ptcleanup.c errno-loc.c signals.c \

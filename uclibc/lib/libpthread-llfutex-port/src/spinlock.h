@@ -14,6 +14,9 @@
 
 #include <bits/initspin.h>
 
+#include <l4/sys/semaphore.h>
+#include "sema_init.h"
+
 /* There are 2 compare and swap synchronization primitives with
    different semantics:
 
@@ -99,7 +102,7 @@ extern int __pthread_unlock(struct _pthread_fastlock *lock);
 static __inline__ void __pthread_init_lock(struct _pthread_fastlock * lock)
 {
   lock->__status = 0;
-  lock->__spinlock = __LT_SPINLOCK_INIT;
+  lock->__semaphore = acquire_l4_semaphore_cap();
 }
 
 static __inline__ int __pthread_trylock (struct _pthread_fastlock * lock)
@@ -109,7 +112,7 @@ static __inline__ int __pthread_trylock (struct _pthread_fastlock * lock)
 #endif
 #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
   {
-    return (testandset(&lock->__spinlock) ? EBUSY : 0);
+    return ((&lock->__status) ? EBUSY : 0);
   }
 #endif
 
@@ -135,39 +138,40 @@ extern void __pthread_alt_unlock(struct _pthread_fastlock *lock);
 
 static __inline__ void __pthread_alt_init_lock(struct _pthread_fastlock * lock)
 {
-  lock->__status = 0;
-  lock->__spinlock = __LT_SPINLOCK_INIT;
+  __pthread_init_lock(lock);
 }
 
 static __inline__ int __pthread_alt_trylock (struct _pthread_fastlock * lock)
 {
-#if defined TEST_FOR_COMPARE_AND_SWAP
-  if (!__pthread_has_cas)
-#endif
-#if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
-  {
-    int res = EBUSY;
+// #if defined TEST_FOR_COMPARE_AND_SWAP
+//   if (!__pthread_has_cas)
+// #endif
+// #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+//   {
+//     int res = EBUSY;
 
-    if (testandset(&lock->__spinlock) == 0)
-      {
-	if (lock->__status == 0)
-	  {
-	    lock->__status = 1;
-	    WRITE_MEMORY_BARRIER();
-	    res = 0;
-	  }
-	lock->__spinlock = __LT_SPINLOCK_INIT;
-      }
-    return res;
-  }
-#endif
+//     if (testandset(&lock->__spinlock) == 0)
+//       {
+// 	if (lock->__status == 0)
+// 	  {
+// 	    lock->__status = 1;
+// 	    WRITE_MEMORY_BARRIER();
+// 	    res = 0;
+// 	  }
+// 	lock->__spinlock = __LT_SPINLOCK_INIT;
+//       }
+//     return res;
+//   }
+// #endif
 
-#if defined HAS_COMPARE_AND_SWAP
-  do {
-    if (lock->__status != 0) return EBUSY;
-  } while(! compare_and_swap(&lock->__status, 0, 1, &lock->__spinlock));
+// #if defined HAS_COMPARE_AND_SWAP
+//   do {
+//     if (lock->__status != 0) return EBUSY;
+//   } while(! compare_and_swap(&lock->__status, 0, 1, &lock->__spinlock));
+//   return 0;
+// #endif
+  __pthread_trylock(lock);
   return 0;
-#endif
 }
 
 /* Operations on pthread_atomic, which is defined in internals.h */

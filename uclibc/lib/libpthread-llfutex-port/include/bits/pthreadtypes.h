@@ -17,6 +17,9 @@
 #include <stddef.h>
 #include <l4/sys/types.h>
 #include <l4/sys/scheduler.h>
+#include <l4/sys/ipc.h>
+#include <l4/sys/types.h>
+#include <l4/sys/consts.h>
 
 #define __need_schedparam
 #include <bits/sched.h>
@@ -25,8 +28,7 @@
 struct _pthread_fastlock
 {
   long int __status;   /* "Free" or "taken" or head of waiting list */
-  int __spinlock;      /* Used by compare_and_swap emulation. Also,
-			  adaptive SMP lock stores spin count here. */
+  l4_cap_idx_t __semaphore; 
 };
 
 #ifndef _PTHREAD_DESCR_DEFINED
