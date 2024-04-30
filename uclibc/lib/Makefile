@@ -2,13 +2,9 @@ PKGDIR	?= ..
 L4DIR	?= $(PKGDIR)/../../..
 
 include $(L4DIR)/mk/Makeconf
+# Inlude choice specfic pthreads variables.
 include $(PKGDIR)/../uclibc/pthread.mk
 
-ifeq ($(CONFIG_UCLIBC_STOCK_TRACING),y)
-TARGET += $(PTH_LLFUTEX)
-else
-TARGET += $(PTH_STOCK)
-endif
-TARGET += uclibc minimal_l4re
+TARGET += $(PTH_TARGET) uclibc minimal_l4re
 
 include $(L4DIR)/mk/subdir.mk

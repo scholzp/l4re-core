@@ -1,12 +1,14 @@
-menu "pThread implementation"
+menu "pthreads implementation"
 
 choice PTHREAD_BACKEND
-    prompt "Backend implementation of pThread to use in C standard library"
-    default UCLIBC_STOCK
-    config UCLIBC_STOCK
-        bool "L4Re standard (uclibc)"
-    config UCLIBC_STOCK_TRACING
-        bool "L4Re standard w/ additional performance traces (uclibc)"
+    prompt "Backend implementation of phtreads mutex."
+    default UCLIBC_PTHREADS_DEFAULT
+    config UCLIBC_PTHREADS_DEFAULT
+        bool "Default L4Re pthreads implementation."
+    config UCLIBC_PTHREADS_SEMAPHORE
+        bool "Pthreads with semaphore based mutex."
+    config UCLIBC_PTHREADS_SPINLOCK_MODIFIED
+        bool "Pthreads with spinlock based mutex, modified."
 endchoice
 
 endmenu
