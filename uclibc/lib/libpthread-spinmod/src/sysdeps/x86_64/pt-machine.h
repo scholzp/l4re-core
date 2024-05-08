@@ -64,7 +64,8 @@ __compare_and_swap (long int *p, long int oldval, long int newval)
   char ret;
   long int readval;
 
-  __asm__ __volatile__ ("lock; cmpxchgq %3, %1; sete %0"
+  __asm__ __volatile__ (
+      "cmp %3, %%rax; jz 1f; lock; cmpxchgq %3, %1; 1: sete %0"
 			: "=q" (ret), "=m" (*p), "=a" (readval)
 			: "r" (newval), "m" (*p), "a" (oldval)
 			: "memory");

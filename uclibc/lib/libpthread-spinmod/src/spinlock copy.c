@@ -360,7 +360,16 @@ static void wait_node_free(struct wait_node *wn)
 void __pthread_alt_lock(struct _pthread_fastlock * lock,
 		        pthread_descr self)
 {
+  
+// #if defined HAS_COMPARE_AND_SWAP
+//   long oldstatus, newstatus;
+// #endif
   struct wait_node wait_node;
+
+// #if defined TEST_FOR_COMPARE_AND_SWAP
+//   if (!__pthread_has_cas)
+// #endif
+// #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
   {
     int suspend_needed = 0;
     __pthread_acquire(&lock->__spinlock);
@@ -369,7 +378,7 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
       lock->__status = 1;
     else {
       if (self == NULL)
-	    self = thread_self();
+	self = thread_self();
 
       wait_node.abandoned = 0;
       wait_node.next = (struct wait_node *) lock->__status;
@@ -378,13 +387,43 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
       suspend_needed = 1;
     }
 
-    // __pthread_release(&lock->__spinlock);
+    __pthread_release(&lock->__spinlock);
 
     // if (suspend_needed)
     //   suspend (self);
-    // __pthread_lock(lock, self);
+    __pthread_lock(lock, self);
     return;
   }
+// #endif
+
+// #if defined HAS_COMPARE_AND_SWAP
+//   do {
+//     oldstatus = lock->__status;
+//     if (oldstatus == 0) {
+//       newstatus = 1;
+//     } else {
+//       if (self == NULL)
+// 	self = thread_self();
+//       wait_node.thr = self;
+//       newstatus = (long) &wait_node;
+//     }
+//     wait_node.abandoned = 0;
+//     wait_node.next = (struct wait_node *) oldstatus;
+//     /* Make sure the store in wait_node.next completes before performing
+//        the compare-and-swap */
+//     MEMORY_BARRIER();
+//   } while(! __compare_and_swap(&lock->__status, oldstatus, newstatus));
+
+//   /* Suspend. Note that unlike in __pthread_lock, we don't worry
+//      here about spurious wakeup. That's because this lock is not
+//      used in situations where that can happen; the restart can
+//      only come from the previous lock owner. */
+
+//   if (oldstatus != 0)
+//     suspend(self);
+
+//   READ_MEMORY_BARRIER();
+// #endif
 }
 
 /* Timed-out lock operation; returns 0 to indicate timeout. */
@@ -479,82 +518,156 @@ int __pthread_alt_timedlock(struct _pthread_fastlock * lock,
 
 void __pthread_alt_unlock(struct _pthread_fastlock *lock)
 {
-  // __pthread_unlock(lock);
-  struct wait_node *p_node, **pp_node, *p_max_prio, **pp_max_prio;
-  struct wait_node ** const pp_head = (struct wait_node **) &lock->__status;
-  int maxprio;
+  __pthread_unlock(lock);
+//   struct wait_node *p_node, **pp_node, *p_max_prio, **pp_max_prio;
+//   struct wait_node ** const pp_head = (struct wait_node **) &lock->__status;
+//   int maxprio;
 
-  WRITE_MEMORY_BARRIER();
-  // __pthread_acquire(&lock->__spinlock);
-  while (1) {
-  /* If no threads are waiting for this lock, try to just
-     atomically release it. */
-    {
-      if (lock->__status == 0 || lock->__status == 1) {
-	      lock->__status = 0;
-	      break;
-      }
-    }
-    /* Process the entire queue of wait nodes. Remove all abandoned
-       wait nodes and put them into the global free queue, and
-       remember the one unabandoned node which refers to the thread
-       having the highest priority. */
+//   WRITE_MEMORY_BARRIER();
 
-    pp_max_prio = pp_node = pp_head;
-    p_max_prio = p_node = *pp_head;
-    maxprio = INT_MIN;
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //   if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+//   {
+//     __pthread_acquire(&lock->__spinlock);
+//   }
+// // #endif
 
-    READ_MEMORY_BARRIER(); /* Prevent access to stale data through p_node */
+//   while (1) {
 
-    while (p_node != (struct wait_node *) 1) {
-      int prio;
-      if (p_node->abandoned) {
-    	  *pp_node = p_node->next;
-      	wait_node_free(p_node);
-        /* Note that the next assignment may take us to the beginning
-        of the queue, to newly inserted nodes, if pp_node == pp_head.
-        In that case we need a memory barrier to stabilize the first of
-        these new nodes. */
-        p_node = *pp_node;
-	      if (pp_node == pp_head)
-	        READ_MEMORY_BARRIER(); /* No stale reads through p_node */
-	      continue;
-      } else if ((prio = p_node->thr->p_priority) >= maxprio) {
-        /* Otherwise remember it if its thread has a higher or equal priority
-          compared to that of any node seen thus far. */
-        maxprio = prio;
-        pp_max_prio = pp_node;
-        p_max_prio = p_node;
-      }
-      /* This canno6 jump backward in the list, so no further read
-         barrier is needed. */
-      pp_node = &p_node->next;
-      p_node = *pp_node;
-    }
+//   /* If no threads are waiting for this lock, try to just
+//      atomically release it. */
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //     if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+//     {
+//       if (lock->__status == 0 || lock->__status == 1) {
+// 	lock->__status = 0;
+// 	break;
+//       }
+//     }
+// // #endif
 
-    /* If all threads abandoned, go back to top */
-    if (maxprio == INT_MIN)
-      continue;
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //     else
+// // #endif
 
-    ASSERT (p_max_prio != (struct wait_node *) 1);
+// // #if defined HAS_COMPARE_AND_SWAP
+// //     {
+// //       long oldstatus = lock->__status;
+// //       if (oldstatus == 0 || oldstatus == 1) {
+// // 	if (__compare_and_swap_with_release_semantics (&lock->__status, oldstatus, 0))
+// // 	  break;
+// // 	else
+// // 	  continue;
+// //       }
+// //     }
+// // #endif
 
-    /* Now we want to to remove the max priority thread's wait node from
-       the list. Before we can do this, we must atomically try to change the
-       node's abandon state from zero to nonzero. If we succeed, that means we
-       have the node that we will wake up. If we failed, then it means the
-       thread timed out and abandoned the node in which case we repeat the
-       whole unlock operation. */
+//     /* Process the entire queue of wait nodes. Remove all abandoned
+//        wait nodes and put them into the global free queue, and
+//        remember the one unabandoned node which refers to the thread
+//        having the highest priority. */
 
-    if (!/*testandset*/(p_max_prio->abandoned)) {
-      p_max_prio->abandoned = 1;
-    	*pp_max_prio = p_max_prio->next;
-      /* Release the spinlock *before* restarting.  */
-	    __pthread_release(&lock->__spinlock);
-      // restart(p_max_prio->thr);
-      return;
-    }
-  }
-    __pthread_release(&lock->__spinlock);
+//     pp_max_prio = pp_node = pp_head;
+//     p_max_prio = p_node = *pp_head;
+//     maxprio = INT_MIN;
+
+//     READ_MEMORY_BARRIER(); /* Prevent access to stale data through p_node */
+
+//     while (p_node != (struct wait_node *) 1) {
+//       int prio;
+
+//       if (p_node->abandoned) {
+// 	/* Remove abandoned node. */
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// // 	if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+// 	  *pp_node = p_node->next;
+// // #endif
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// // 	else
+// // #endif
+// // #if defined HAS_COMPARE_AND_SWAP
+// // 	  wait_node_dequeue(pp_head, pp_node, p_node);
+// // #endif
+// 	wait_node_free(p_node);
+// 	/* Note that the next assignment may take us to the beginning
+// 	   of the queue, to newly inserted nodes, if pp_node == pp_head.
+// 	   In that case we need a memory barrier to stabilize the first of
+// 	   these new nodes. */
+// 	p_node = *pp_node;
+// 	if (pp_node == pp_head)
+// 	  READ_MEMORY_BARRIER(); /* No stale reads through p_node */
+// 	continue;
+//       } else if ((prio = p_node->thr->p_priority) >= maxprio) {
+// 	/* Otherwise remember it if its thread has a higher or equal priority
+// 	   compared to that of any node seen thus far. */
+// 	maxprio = prio;
+// 	pp_max_prio = pp_node;
+// 	p_max_prio = p_node;
+//       }
+
+//       /* This canno6 jump backward in the list, so no further read
+//          barrier is needed. */
+//       pp_node = &p_node->next;
+//       p_node = *pp_node;
+//     }
+
+//     /* If all threads abandoned, go back to top */
+//     if (maxprio == INT_MIN)
+//       continue;
+
+//     ASSERT (p_max_prio != (struct wait_node *) 1);
+
+//     /* Now we want to to remove the max priority thread's wait node from
+//        the list. Before we can do this, we must atomically try to change the
+//        node's abandon state from zero to nonzero. If we succeed, that means we
+//        have the node that we will wake up. If we failed, then it means the
+//        thread timed out and abandoned the node in which case we repeat the
+//        whole unlock operation. */
+
+//     if (!testandset(&p_max_prio->abandoned)) {
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //       if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+// 	*pp_max_prio = p_max_prio->next;
+// // #endif
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //       else
+// // #endif
+// // #if defined HAS_COMPARE_AND_SWAP
+// // 	wait_node_dequeue(pp_head, pp_max_prio, p_max_prio);
+// // #endif
+
+//       /* Release the spinlock *before* restarting.  */
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //       if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+// 	{
+// 	  __pthread_release(&lock->__spinlock);
+// 	}
+// // #endif
+
+//       restart(p_max_prio->thr);
+
+//       return;
+//     }
+//   }
+
+// // #if defined TEST_FOR_COMPARE_AND_SWAP
+// //   if (!__pthread_has_cas)
+// // #endif
+// // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+//   {
+//     __pthread_release(&lock->__spinlock);
+//   }
+// #endif
 }
 
 
@@ -610,16 +723,16 @@ static void __pthread_acquire(int * spinlock)
 
   READ_MEMORY_BARRIER();
 
-  // while (testandset(spinlock)) {
-  //   if (cnt < MAX_SPIN_COUNT) {
-  //     l4_thread_yield();
-  //     cnt++;
-  //   } else {
-  //     l4_usleep(SPIN_SLEEP_DURATION / 1000);
-  //     cnt = 0;
-  //   }
-  // }
-while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock) __builtin_ia32_pause();
+  while (testandset(spinlock)) {
+    if (cnt < MAX_SPIN_COUNT) {
+      l4_thread_yield();
+      cnt++;
+    } else {
+      l4_usleep(SPIN_SLEEP_DURATION / 1000);
+      cnt = 0;
+    }
+  }
+// while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock) __builtin_ia32_pause();
 //   while (1) {
 //     if ((*spinlock) == __LT_SPINLOCK_INIT) {
 //       if (!testandset(spinlock))
