@@ -37,7 +37,7 @@ public:
 
   explicit
   Dbg(unsigned long mask, char const *subs = 0)
-  : L4Re::Util::Dbg(mask, "L4Re", subs)
+  : L4Re::Util::Dbg(mask, "l4re_kernel", subs)
   {}
 };
 
