@@ -19,16 +19,21 @@
 
 #include <l4/sys/types.h>
 #include <l4/sys/semaphore.h>
+#include <stdio.h>
+#include <l4/util/util.h>
 
 /* Primitives for controlling thread execution */
 
 static __inline__ void restart(pthread_descr th)
 {
   l4_semaphore_up(th->p_thsem_cap);
+  // l4_usleep(5);
 }
 
 static __inline__ void suspend(pthread_descr self)
 {
+  // printf("IPC send at %llu\n", __builtin_ia32_rdtsc ());
+  // 
   l4_semaphore_down(self->p_thsem_cap, L4_IPC_NEVER);
 }
 

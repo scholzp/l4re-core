@@ -64,7 +64,12 @@ l4_semaphore_up(l4_cap_idx_t sem) L4_NOTHROW
 L4_INLINE l4_msgtag_t
 l4_semaphore_up_u(l4_cap_idx_t sem, l4_utcb_t *utcb) L4_NOTHROW
 {
-  return l4_irq_trigger_u(sem, utcb);
+
+  l4_msg_regs_t *m = l4_utcb_mr_u(utcb);
+  m->mr64[1] = __builtin_ia32_rdtsc ();
+    return l4_ipc_send(sem, utcb, l4_msgtag(L4_PROTO_IRQ, 0, 0, L4_MSGTAG_SCHEDULE),
+                     L4_IPC_NEVER);
+  // return l4_irq_trigger_u(sem, utcb);
 }
 
 /**
@@ -102,7 +107,9 @@ l4_semaphore_down_u(l4_cap_idx_t sem, l4_timeout_t to,
 {
   l4_msg_regs_t *m = l4_utcb_mr_u(utcb);
   m->mr[0] = L4_SEMAPHORE_OP_DOWN;
-  return l4_ipc_call(sem, utcb, l4_msgtag(L4_PROTO_SEMAPHORE, 1, 0, 0), to);
+  m->mr64[1] = __builtin_ia32_rdtsc ();
+  // return l4_ipc_call(sem, utcb, l4_msgtag(L4_PROTO_SEMAPHORE, 1, 0, 0), to);
+  return l4_ipc_call(sem, utcb, l4_msgtag(L4_PROTO_SEMAPHORE, 3, 0, L4_MSGTAG_SCHEDULE), to);
 }
 
 

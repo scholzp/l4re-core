@@ -68,7 +68,7 @@ struct Semaphore : Kobject_t<Semaphore, Triggerable, L4_PROTO_SEMAPHORE>
    * least 2^31-1.
    */
   l4_msgtag_t up(l4_utcb_t *utcb = l4_utcb()) noexcept
-  { return trigger(utcb); }
+  { return l4_semaphore_up_u(cap(), utcb);}//trigger(utcb); }
 
   /**
    * Semaphore down operation.

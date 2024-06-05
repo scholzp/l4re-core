@@ -26,6 +26,7 @@
 #include "spinlock.h"
 #include "queue.h"
 #include "restart.h"
+#include "stdio.h"
 
 int
 attribute_hidden
@@ -109,9 +110,11 @@ __pthread_mutex_lock(pthread_mutex_t * mutex)
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
     __pthread_lock(&mutex->__m_lock, NULL);
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     return 0;
   case PTHREAD_MUTEX_RECURSIVE_NP:
     self = thread_self();
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
     if (mutex->__m_owner == self) {
       mutex->__m_count++;
       return 0;
@@ -121,12 +124,14 @@ __pthread_mutex_lock(pthread_mutex_t * mutex)
     mutex->__m_count = 0;
     return 0;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     self = thread_self();
     if (mutex->__m_owner == self) return EDEADLK;
     __pthread_alt_lock(&mutex->__m_lock, self);
     mutex->__m_owner = self;
     return 0;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     __pthread_alt_lock(&mutex->__m_lock, NULL);
     return 0;
   default:
@@ -189,9 +194,11 @@ __pthread_mutex_unlock(pthread_mutex_t * mutex)
 {
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     __pthread_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_RECURSIVE_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
     if (mutex->__m_owner != thread_self())
       return EPERM;
     if (mutex->__m_count > 0) {
@@ -202,12 +209,14 @@ __pthread_mutex_unlock(pthread_mutex_t * mutex)
     __pthread_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     if (mutex->__m_owner != thread_self() || mutex->__m_lock.__status == 0)
       return EPERM;
     mutex->__m_owner = NULL;
     __pthread_alt_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     __pthread_alt_unlock(&mutex->__m_lock);
     return 0;
   default:

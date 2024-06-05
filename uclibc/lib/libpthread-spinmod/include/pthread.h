@@ -696,4 +696,12 @@ extern int pthread_getaffinity_np (pthread_t __th, size_t __cpusetsize,
 
 __END_DECLS
 
+extern unsigned long long PTHREAD_LOOP_CYCLES;
+extern unsigned long long PTHREAD_LOOP_RETRIES;
+extern unsigned long long PTHREAD_LOCK_CALLS[4];
+extern unsigned long long PTHREAD_UNLOCK_CALLS[4];
+extern unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
+extern unsigned long long PTHREAD_RESTART_TIME;
+extern unsigned long long PTHREAD_ALTLOCK_TIME;
+
 #endif	/* pthread.h */

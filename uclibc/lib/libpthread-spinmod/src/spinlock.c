@@ -180,6 +180,7 @@ int __pthread_unlock(struct _pthread_fastlock * lock)
 // #endif
 // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
   {
+    // PTHREAD_LOOP_CYCLES =40;
     __pthread_release(&lock->__spinlock);
     return 0;
   }
@@ -268,6 +269,12 @@ int __pthread_unlock(struct _pthread_fastlock * lock)
  * deallocate the abandoned node.
  */
 
+inline unsigned long long time_diff_to_ns(struct timespec* start, struct timespec* end) {
+  if (end->tv_nsec > start->tv_nsec)
+    return (end->tv_sec - start->tv_sec) * 1000000000 + (end->tv_nsec - start->tv_nsec);
+  else 
+    return (end->tv_sec - start->tv_sec - 1) * 1000000000 + (1000000000 + end->tv_nsec - start->tv_nsec);
+}
 
 struct wait_node {
   struct wait_node *next;	/* Next node in null terminated linked list */
@@ -361,6 +368,8 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
 		        pthread_descr self)
 {
   struct wait_node wait_node;
+  struct timespec te, ts; 
+  clock_gettime(CLOCK_MONOTONIC, &ts);
   {
     int suspend_needed = 0;
     __pthread_acquire(&lock->__spinlock);
@@ -378,10 +387,13 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
       suspend_needed = 1;
     }
 
-    // __pthread_release(&lock->__spinlock);
+    __pthread_release(&lock->__spinlock);
 
-    // if (suspend_needed)
-    //   suspend (self);
+    clock_gettime(CLOCK_MONOTONIC, &te);
+    PTHREAD_ALTLOCK_TIME += time_diff_to_ns(&ts, &te);
+    if (suspend_needed){
+      suspend (self);
+    }
     // __pthread_lock(lock, self);
     return;
   }
@@ -484,8 +496,14 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
   struct wait_node ** const pp_head = (struct wait_node **) &lock->__status;
   int maxprio;
 
+  unsigned long long retires = 0;
+  unsigned long long cycles = 0;
+  struct timespec ts, te; 
+
   WRITE_MEMORY_BARRIER();
-  // __pthread_acquire(&lock->__spinlock);
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  __pthread_acquire(&lock->__spinlock);
   while (1) {
   /* If no threads are waiting for this lock, try to just
      atomically release it. */
@@ -505,26 +523,27 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
     maxprio = INT_MIN;
 
     READ_MEMORY_BARRIER(); /* Prevent access to stale data through p_node */
-
     while (p_node != (struct wait_node *) 1) {
+      ++cycles;
       int prio;
       if (p_node->abandoned) {
     	  *pp_node = p_node->next;
-      	wait_node_free(p_node);
+      	// wait_node_free(p_node);
         /* Note that the next assignment may take us to the beginning
         of the queue, to newly inserted nodes, if pp_node == pp_head.
         In that case we need a memory barrier to stabilize the first of
         these new nodes. */
         p_node = *pp_node;
 	      if (pp_node == pp_head)
-	        READ_MEMORY_BARRIER(); /* No stale reads through p_node */
+	        // READ_MEMORY_BARRIER(); /* No stale reads through p_node */
 	      continue;
-      } else if ((prio = p_node->thr->p_priority) >= maxprio) {
+      } else if (p_node->thr->p_priority >= maxprio) {
+          prio = p_node->thr->p_priority;
+          maxprio = prio;
+          pp_max_prio = pp_node;
+          p_max_prio = p_node;
         /* Otherwise remember it if its thread has a higher or equal priority
           compared to that of any node seen thus far. */
-        maxprio = prio;
-        pp_max_prio = pp_node;
-        p_max_prio = p_node;
       }
       /* This canno6 jump backward in the list, so no further read
          barrier is needed. */
@@ -545,16 +564,35 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
        thread timed out and abandoned the node in which case we repeat the
        whole unlock operation. */
 
-    if (!/*testandset*/(p_max_prio->abandoned)) {
-      p_max_prio->abandoned = 1;
+    if (!testandset(&p_max_prio->abandoned)/*(p_max_prio->abandoned)*/) {
     	*pp_max_prio = p_max_prio->next;
       /* Release the spinlock *before* restarting.  */
 	    __pthread_release(&lock->__spinlock);
-      // restart(p_max_prio->thr);
+      clock_gettime(CLOCK_MONOTONIC, &te);
+      PTHREAD_QUEUE_TRAVERSE_TIME += time_diff_to_ns(&ts, &te);
+
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      restart(p_max_prio->thr);
+      clock_gettime(CLOCK_MONOTONIC, &te);
+      PTHREAD_RESTART_TIME += time_diff_to_ns(&ts, &te);
+      
+      if (PTHREAD_LOOP_RETRIES < retires)
+        PTHREAD_LOOP_RETRIES = retires;
+      if (PTHREAD_LOOP_CYCLES < cycles)
+        PTHREAD_LOOP_CYCLES = cycles;
+      // l4_usleep(1);
       return;
     }
+    ++retires;
   }
-    __pthread_release(&lock->__spinlock);
+  clock_gettime(CLOCK_MONOTONIC, &te);
+  PTHREAD_QUEUE_TRAVERSE_TIME += time_diff_to_ns(&ts, &te);
+  if (PTHREAD_LOOP_RETRIES < retires)
+      PTHREAD_LOOP_RETRIES = retires;
+  if (PTHREAD_LOOP_CYCLES < cycles)
+    PTHREAD_LOOP_CYCLES = cycles;
+
+  __pthread_release(&lock->__spinlock);
 }
 
 
@@ -610,16 +648,18 @@ static void __pthread_acquire(int * spinlock)
 
   READ_MEMORY_BARRIER();
 
-  // while (testandset(spinlock)) {
-  //   if (cnt < MAX_SPIN_COUNT) {
-  //     l4_thread_yield();
-  //     cnt++;
-  //   } else {
-  //     l4_usleep(SPIN_SLEEP_DURATION / 1000);
-  //     cnt = 0;
-  //   }
-  // }
-while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock) __builtin_ia32_pause();
+  while (testandset(spinlock)) {
+    if (cnt < MAX_SPIN_COUNT) {
+      l4_thread_yield();
+      cnt++;
+    } else {
+      l4_usleep(SPIN_SLEEP_DURATION / 1000);
+      cnt = 0;
+    }
+  }
+// while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock){
+//     __builtin_ia32_pause();
+// }
 //   while (1) {
 //     if ((*spinlock) == __LT_SPINLOCK_INIT) {
 //       if (!testandset(spinlock))

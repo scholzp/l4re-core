@@ -41,6 +41,14 @@
 #include <link.h>
 #include <ldsodefs.h>
 
+unsigned long long PTHREAD_LOOP_CYCLES;
+unsigned long long PTHREAD_LOCK_CALLS[4];
+unsigned long long PTHREAD_UNLOCK_CALLS[4];
+unsigned long long PTHREAD_LOOP_RETRIES;
+unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
+unsigned long long PTHREAD_RESTART_TIME;
+unsigned long long PTHREAD_ALTLOCK_TIME;
+
 /* Sanity check.  */
 #if !defined __SIGRTMIN || (__SIGRTMAX - __SIGRTMIN) < 3
 # error "This must not happen"
