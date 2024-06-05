@@ -1,14 +1,10 @@
-menu "pthreads implementation"
-
-choice PTHREAD_BACKEND
-    prompt "Backend implementation of phtreads mutex."
+choice
+    prompt "Backend implementation of phtreads mutex"
     default UCLIBC_PTHREADS_DEFAULT
     config UCLIBC_PTHREADS_DEFAULT
-        bool "Default L4Re pthreads implementation."
+        bool "Default L4Re pthreads implementation"
     config UCLIBC_PTHREADS_SEMAPHORE
-        bool "Pthreads with semaphore based mutex."
+        bool "Pthreads with semaphore based mutex"
     config UCLIBC_PTHREADS_SPINLOCK_MODIFIED
-        bool "Pthreads with spinlock based mutex, modified."
+        bool "Pthreads with spinlock based mutex, modified"
 endchoice
-
-endmenu
