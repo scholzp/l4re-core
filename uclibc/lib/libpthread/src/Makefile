@@ -22,7 +22,7 @@ DIR_sparc := sparc
 
 SRC_CC      = manager.cc l4.cc
 SRC_C      += spinlock.c mutex.c condvar.c rwlock.c errno.c specific.c \
-              semaphore.c attr.c barrier.c join.c pthread.c \
+              semaphore.c attr.c barrier.c futex.c join.c pthread.c \
               cancel.c ptcleanup.c errno-loc.c signals.c \
               sysdeps/$(DIR_$(ARCH))/pspinlock.c
 SRC_C_libpthread.a += libc_pthread_init.c

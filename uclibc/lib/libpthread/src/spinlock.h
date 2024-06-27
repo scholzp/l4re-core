@@ -13,6 +13,7 @@
 /* GNU Library General Public License for more details.                 */
 
 #include <bits/initspin.h>
+#include <errno.h>
 
 /* There are 2 compare and swap synchronization primitives with
    different semantics:
@@ -218,5 +219,9 @@ __pthread_set_own_extricate_if (pthread_descr self, pthread_extricate_if *peif)
 	__pthread_unlock (THREAD_GETMEM(self, p_lock));
     }
 }
+
+extern void __pthread_acquire(int * spinlock);
+
+extern void __pthread_release(int * spinlock);
 
 __END_DECLS

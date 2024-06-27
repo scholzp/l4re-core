@@ -26,6 +26,7 @@
 #include "spinlock.h"
 #include "queue.h"
 #include "restart.h"
+#include "stdio.h"
 
 int
 attribute_hidden
@@ -227,7 +228,7 @@ strong_alias (__pthread_mutexattr_init, pthread_mutexattr_init)
 
 int
 attribute_hidden
-__pthread_mutexattr_destroy(pthread_mutexattr_t *attr attribute_unused)
+__pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
 {
   return 0;
 }
@@ -262,7 +263,7 @@ weak_alias (__pthread_mutexattr_getkind_np, pthread_mutexattr_getkind_np)
 
 int
 attribute_hidden
-__pthread_mutexattr_getpshared (const pthread_mutexattr_t *attr attribute_unused,
+__pthread_mutexattr_getpshared (const pthread_mutexattr_t *attr,
 				   int *pshared)
 {
   *pshared = PTHREAD_PROCESS_PRIVATE;
@@ -272,7 +273,7 @@ weak_alias (__pthread_mutexattr_getpshared, pthread_mutexattr_getpshared)
 
 int
 attribute_hidden
-__pthread_mutexattr_setpshared (pthread_mutexattr_t *attr attribute_unused, int pshared)
+__pthread_mutexattr_setpshared (pthread_mutexattr_t *attr, int pshared)
 {
   if (pshared != PTHREAD_PROCESS_PRIVATE && pshared != PTHREAD_PROCESS_SHARED)
     return EINVAL;
