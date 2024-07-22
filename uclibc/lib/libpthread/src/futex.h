@@ -15,52 +15,26 @@
 // int futex_wake(uint64_t *uaddr, unsigned int flags, int nr_wake, u32 bitset);
 
 // Structs an so on
+#define MAX_FUTEX_COUNT 1024*16
+#define MAX_THREADS_PER_FUTEX 1024
 
-
-// Wait node of a thread
 struct wait_node {
-	struct wait_node *next;	/* Next node in null terminated linked list */
-	struct wait_node *prev;	/* Next node in null terminated linked list */
-	pthread_descr thr;		/* The thread waiting with this node */
+	pthread_descr descr;
+	char slot_is_used;
 };
 
 struct futex{
-	struct wait_node *sleep_queue_head; // Wait nodes of threads sleeping on this futex
-	struct wait_node *sleep_queue_tail;
+	struct wait_node wait_queue[MAX_THREADS_PER_FUTEX];
+	unsigned long wait_queue_index;
 	int spinlock;
-	int queue_dirty;
+	char slot_is_used;
+	uint64_t *uaddress;
 };
 
-struct futex_node{
-	struct futex *futex;	 // Pointer to the futex of this entry
-	struct futex_node *next; // Pointer to the next entry
-	struct futex_node *prev; // Pointer to the next entry
-	uint64_t *uaddress;	  // User address this futex belongs to.
-	int spinlock;
-};
-
-// Simply create a futex and return the pointer
-void create_futex(struct futex **futex);
-// Respective function to clean up memory
-void destroy_futex(struct futex *futex);
-
-void add_wait_node(struct futex *futex, pthread_descr descr);
-
-int remove_wait_node(struct futex *futex, pthread_descr descr);
-
-struct wait_node **find_wait_node(struct futex *futex, pthread_descr descr);
-
-int find_futex(struct futex_node *head, struct futex **futex,
-				uint64_t *address);
-
-void add_futex_node(struct futex_node **head, struct futex **futex,
-					uint64_t *address);
-
-// Respective function to clean up memory
-void destroy_futex_list(struct futex_node *head);
-
-// global futex list head
-extern struct futex_node *global_futex_list;
+extern struct futex futex_list[MAX_FUTEX_COUNT];
+extern unsigned long futex_last_used_index;
+extern unsigned long futex_first_free_index;
+extern int global_futex_sp;
 
 /*
  * Put the current thread on the sleep queue of the futex at address

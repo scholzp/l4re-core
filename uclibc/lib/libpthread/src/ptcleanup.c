@@ -55,5 +55,4 @@ __pthread_cleanup_upto (__jmp_buf target, char *targetframe)
       && _JMPBUF_UNWINDS(target, THREAD_GETMEM(self, p_in_sighandler)))
     THREAD_SETMEM(self, p_in_sighandler, NULL);
 #endif
-  destroy_futex_list(global_futex_list);
 }

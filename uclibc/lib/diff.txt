@@ -1,0 +1,1666 @@
+diff -r libpthread/include/bits/initspin.h libpthread-spinmod/include/bits/initspin.h
+16,17c16,18
+<    License along with the GNU C Library; see the file COPYING.LIB.  If
+<    not, see <http://www.gnu.org/licenses/>.  */
+---
+>    License along with the GNU C Library; see the file COPYING.LIB.  If not,
+>    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+>    Boston, MA 02111-1307, USA.  */
+diff -r libpthread/include/bits/libc-lock.h libpthread-spinmod/include/bits/libc-lock.h
+2c2
+<    Copyright (C) 1996,1997,1998,1999,2000,2001,2002,2003
+---
+>    Copyright (C) 1996,1997,1998,1999,2000,2001,2002,2003,2006
+17,18c17,19
+<    License along with the GNU C Library; see the file COPYING.LIB.  If
+<    not, see <http://www.gnu.org/licenses/>.  */
+---
+>    License along with the GNU C Library; see the file COPYING.LIB.  If not,
+>    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+>    Boston, MA 02111-1307, USA.  */
+34c35
+< typedef pthread_mutex_t __libc_lock_recursive_t;
+---
+> typedef struct { pthread_mutex_t mutex; } __libc_lock_recursive_t;
+90c91,92
+< #define _LIBC_LOCK_RECURSIVE_INITIALIZER PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+---
+> #define _LIBC_LOCK_RECURSIVE_INITIALIZER \
+>   {PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP}
+94c96,97
+< #define _RTLD_LOCK_RECURSIVE_INITIALIZER PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+---
+> #define _RTLD_LOCK_RECURSIVE_INITIALIZER \
+>   {PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP}
+108,109c111,117
+< 
+< #define __libc_maybe_call2(FUNC, ARGS, ELSE) __libc_maybe_call (__##FUNC, ARGS, ELSE)
+---
+> #if defined _LIBC && !defined NOT_IN_libc && defined SHARED
+> # define __libc_maybe_call2(FUNC, ARGS, ELSE) \
+>   ({__builtin_expect (__libc_pthread_functions.ptr_##FUNC != NULL, 0) \
+>     ? __libc_pthread_functions.ptr_##FUNC ARGS : ELSE; })
+> #else
+> # define __libc_maybe_call2(FUNC, ARGS, ELSE) __libc_maybe_call (__##FUNC, ARGS, ELSE)
+> #endif
+129,152d136
+< /* Same as last but this time we initialize an adaptive mutex.  */
+< #if defined _LIBC && !defined NOT_IN_libc && defined SHARED
+< #define __libc_lock_init_adaptive(NAME) \
+<   ({									      \
+<     (NAME).__m_count = 0;						      \
+<     (NAME).__m_owner = NULL;						      \
+<     (NAME).__m_kind = PTHREAD_MUTEX_ADAPTIVE_NP;			      \
+<     (NAME).__m_lock.__status = 0;					      \
+<     (NAME).__m_lock.__spinlock = __LT_SPINLOCK_INIT;			      \
+<     0; })
+< #else
+< #define __libc_lock_init_adaptive(NAME) \
+<   do {									      \
+<     if (__pthread_mutex_init != NULL)					      \
+<       {									      \
+< 	pthread_mutexattr_t __attr;					      \
+< 	__pthread_mutexattr_init (&__attr);				      \
+< 	__pthread_mutexattr_settype (&__attr, PTHREAD_MUTEX_ADAPTIVE_NP);     \
+< 	__pthread_mutex_init (&(NAME), &__attr);			      \
+< 	__pthread_mutexattr_destroy (&__attr);				      \
+<       }									      \
+<   } while (0);
+< #endif
+< 
+157,161c141,145
+<     (NAME).__m_count = 0;						      \
+<     (NAME).__m_owner = NULL;					      \
+<     (NAME).__m_kind = PTHREAD_MUTEX_RECURSIVE_NP;			      \
+<     (NAME).__m_lock.__status = 0;					      \
+<     (NAME).__m_lock.__spinlock = __LT_SPINLOCK_INIT;		      \
+---
+>     (NAME).mutex.__m_count = 0;						      \
+>     (NAME).mutex.__m_owner = NULL;					      \
+>     (NAME).mutex.__m_kind = PTHREAD_MUTEX_RECURSIVE_NP;			      \
+>     (NAME).mutex.__m_lock.__status = 0;					      \
+>     (NAME).mutex.__m_lock.__spinlock = __LT_SPINLOCK_INIT;		      \
+171c155
+< 	__pthread_mutex_init (&(NAME), &__attr);			      \
+---
+> 	__pthread_mutex_init (&(NAME).mutex, &__attr);			      \
+188c172
+< #define __libc_lock_fini_recursive(NAME) __libc_lock_fini (NAME)
+---
+> #define __libc_lock_fini_recursive(NAME) __libc_lock_fini ((NAME).mutex)
+200c184
+< #define __libc_lock_lock_recursive(NAME) __libc_lock_lock (NAME)
+---
+> #define __libc_lock_lock_recursive(NAME) __libc_lock_lock ((NAME).mutex)
+211c195
+< #define __libc_lock_trylock_recursive(NAME) __libc_lock_trylock (NAME)
+---
+> #define __libc_lock_trylock_recursive(NAME) __libc_lock_trylock ((NAME).mutex)
+222c206
+< #define __libc_lock_unlock_recursive(NAME) __libc_lock_unlock (NAME)
+---
+> #define __libc_lock_unlock_recursive(NAME) __libc_lock_unlock ((NAME).mutex)
+232c216
+<   GL(dl_rtld_lock_recursive) (&(NAME))
+---
+>   GL(dl_rtld_lock_recursive) (&(NAME).mutex)
+235c219
+<   GL(dl_rtld_unlock_recursive) (&(NAME))
+---
+>   GL(dl_rtld_unlock_recursive) (&(NAME).mutex)
+259c243
+<       (ONCE_CONTROL) = !PTHREAD_ONCE_INIT;				      \
+---
+>       (ONCE_CONTROL) = 2;						      \
+285d268
+< #if 0
+293d275
+< #endif
+320c302
+< 				 const pthread_mutexattr_t *__mutex_attr);
+---
+> 				 __const pthread_mutexattr_t *__mutex_attr);
+339c321
+< 				  const pthread_rwlockattr_t *__attr);
+---
+> 				  __const pthread_rwlockattr_t *__attr);
+358c340
+< 				  const void *__pointer);
+---
+> 				  __const void *__pointer);
+367a350,410
+> 
+> /* This function is called to initialize the pthread library.  */
+> extern void __pthread_initialize (void);
+> 
+> /* Make the pthread functions weak so that we can elide them from
+>    single-threaded processes.  */
+> #ifndef __NO_WEAK_PTHREAD_ALIASES
+> # ifdef weak_extern
+> #   define BP_SYM(sym) sym
+> weak_extern (BP_SYM (__pthread_mutex_init))
+> weak_extern (BP_SYM (__pthread_mutex_destroy))
+> weak_extern (BP_SYM (__pthread_mutex_lock))
+> weak_extern (BP_SYM (__pthread_mutex_trylock))
+> weak_extern (BP_SYM (__pthread_mutex_unlock))
+> weak_extern (BP_SYM (__pthread_mutexattr_init))
+> weak_extern (BP_SYM (__pthread_mutexattr_destroy))
+> weak_extern (BP_SYM (__pthread_mutexattr_settype))
+> weak_extern (BP_SYM (__pthread_rwlock_init))
+> weak_extern (BP_SYM (__pthread_rwlock_destroy))
+> weak_extern (BP_SYM (__pthread_rwlock_rdlock))
+> weak_extern (BP_SYM (__pthread_rwlock_tryrdlock))
+> weak_extern (BP_SYM (__pthread_rwlock_wrlock))
+> weak_extern (BP_SYM (__pthread_rwlock_trywrlock))
+> weak_extern (BP_SYM (__pthread_rwlock_unlock))
+> weak_extern (BP_SYM (__pthread_key_create))
+> weak_extern (BP_SYM (__pthread_setspecific))
+> weak_extern (BP_SYM (__pthread_getspecific))
+> weak_extern (BP_SYM (__pthread_once))
+> weak_extern (__pthread_initialize)
+> weak_extern (__pthread_atfork)
+> weak_extern (BP_SYM (_pthread_cleanup_push))
+> weak_extern (BP_SYM (_pthread_cleanup_pop))
+> weak_extern (BP_SYM (_pthread_cleanup_push_defer))
+> weak_extern (BP_SYM (_pthread_cleanup_pop_restore))
+> # else
+> #  pragma weak __pthread_mutex_init
+> #  pragma weak __pthread_mutex_destroy
+> #  pragma weak __pthread_mutex_lock
+> #  pragma weak __pthread_mutex_trylock
+> #  pragma weak __pthread_mutex_unlock
+> #  pragma weak __pthread_mutexattr_init
+> #  pragma weak __pthread_mutexattr_destroy
+> #  pragma weak __pthread_mutexattr_settype
+> #  pragma weak __pthread_rwlock_destroy
+> #  pragma weak __pthread_rwlock_rdlock
+> #  pragma weak __pthread_rwlock_tryrdlock
+> #  pragma weak __pthread_rwlock_wrlock
+> #  pragma weak __pthread_rwlock_trywrlock
+> #  pragma weak __pthread_rwlock_unlock
+> #  pragma weak __pthread_key_create
+> #  pragma weak __pthread_setspecific
+> #  pragma weak __pthread_getspecific
+> #  pragma weak __pthread_once
+> #  pragma weak __pthread_initialize
+> #  pragma weak __pthread_atfork
+> #  pragma weak _pthread_cleanup_push_defer
+> #  pragma weak _pthread_cleanup_pop_restore
+> #  pragma weak _pthread_cleanup_push
+> #  pragma weak _pthread_cleanup_pop
+> # endif
+> #endif
+diff -r libpthread/include/bits/pthreadtypes.h libpthread-spinmod/include/bits/pthreadtypes.h
+1,2d0
+< /* Linuxthreads - a simple clone()-based implementation of Posix        */
+< /* threads for Linux.                                                   */
+15,17c13
+< #if !defined _BITS_TYPES_H && !defined _PTHREAD_H
+< # error "Never include <bits/pthreadtypes.h> directly; use <sys/types.h> instead."
+< #endif
+---
+> /* 2008 Alexander Warg --- L4 adaption                                  */
+19,20c15
+< #ifndef _BITS_PTHREADTYPES_H
+< #define _BITS_PTHREADTYPES_H	1
+---
+> #pragma once
+22d16
+< #define __need_size_t
+141c135
+< typedef volatile int pthread_spinlock_t;
+---
+> typedef __volatile__ int pthread_spinlock_t;
+161,162d154
+< 
+< #endif	/* bits/pthreadtypes.h */
+diff -r libpthread/include/pthread.h libpthread-spinmod/include/pthread.h
+170c170
+< 			   const pthread_attr_t *__restrict __attr,
+---
+> 			   __const pthread_attr_t *__restrict __attr,
+210c210
+< extern int pthread_attr_getdetachstate (const pthread_attr_t *__attr,
+---
+> extern int pthread_attr_getdetachstate (__const pthread_attr_t *__attr,
+215c215
+< 				       const struct sched_param *__restrict
+---
+> 				       __const struct sched_param *__restrict
+219c219
+< extern int pthread_attr_getschedparam (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getschedparam (__const pthread_attr_t *__restrict
+229c229
+< extern int pthread_attr_getschedpolicy (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getschedpolicy (__const pthread_attr_t *__restrict
+238c238
+< extern int pthread_attr_getinheritsched (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getinheritsched (__const pthread_attr_t *__restrict
+247c247
+< extern int pthread_attr_getscope (const pthread_attr_t *__restrict __attr,
+---
+> extern int pthread_attr_getscope (__const pthread_attr_t *__restrict __attr,
+256c256
+< extern int pthread_attr_getguardsize (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getguardsize (__const pthread_attr_t *__restrict
+270c270
+< extern int pthread_attr_getstackaddr (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getstackaddr (__const pthread_attr_t *__restrict
+283c283
+< extern int pthread_attr_getstack (const pthread_attr_t *__restrict __attr,
+---
+> extern int pthread_attr_getstack (__const pthread_attr_t *__restrict __attr,
+295c295
+< extern int pthread_attr_getstacksize (const pthread_attr_t *__restrict
+---
+> extern int pthread_attr_getstacksize (__const pthread_attr_t *__restrict
+311c311
+< 				  const struct sched_param *__param)
+---
+> 				  __const struct sched_param *__param)
+333c333
+< 			       const pthread_mutexattr_t *__restrict
+---
+> 			       __const pthread_mutexattr_t *__restrict
+348c348
+< 				    const struct timespec *__restrict
+---
+> 				    __const struct timespec *__restrict
+366c366
+< extern int pthread_mutexattr_getpshared (const pthread_mutexattr_t *
+---
+> extern int pthread_mutexattr_getpshared (__const pthread_mutexattr_t *
+382c382
+< extern int pthread_mutexattr_gettype (const pthread_mutexattr_t *__restrict
+---
+> extern int pthread_mutexattr_gettype (__const pthread_mutexattr_t *__restrict
+392c392
+< 			      const pthread_condattr_t *__restrict
+---
+> 			      __const pthread_condattr_t *__restrict
+415c415
+< 				   const struct timespec *__restrict
+---
+> 				   __const struct timespec *__restrict
+427c427
+< extern int pthread_condattr_getpshared (const pthread_condattr_t *
+---
+> extern int pthread_condattr_getpshared (__const pthread_condattr_t *
+442c442
+< 				const pthread_rwlockattr_t *__restrict
+---
+> 				__const pthread_rwlockattr_t *__restrict
+457c457
+< 				       const struct timespec *__restrict
+---
+> 				       __const struct timespec *__restrict
+470c470
+< 				       const struct timespec *__restrict
+---
+> 				       __const struct timespec *__restrict
+487c487
+< extern int pthread_rwlockattr_getpshared (const pthread_rwlockattr_t *
+---
+> extern int pthread_rwlockattr_getpshared (__const pthread_rwlockattr_t *
+496c496
+< extern int pthread_rwlockattr_getkind_np (const pthread_rwlockattr_t *__attr,
+---
+> extern int pthread_rwlockattr_getkind_np (__const pthread_rwlockattr_t *__attr,
+529c529
+< 				 const pthread_barrierattr_t *__restrict
+---
+> 				 __const pthread_barrierattr_t *__restrict
+538c538
+< extern int pthread_barrierattr_getpshared (const pthread_barrierattr_t *
+---
+> extern int pthread_barrierattr_getpshared (__const pthread_barrierattr_t *
+565c565
+< 				const void *__pointer) __THROW;
+---
+> 				__const void *__pointer) __THROW;
+697a698,705
+> 
+> extern unsigned long long PTHREAD_LOOP_CYCLES;
+> extern unsigned long long PTHREAD_LOOP_RETRIES;
+> extern unsigned long long PTHREAD_LOCK_CALLS[4];
+> extern unsigned long long PTHREAD_UNLOCK_CALLS[4];
+> extern unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
+> extern unsigned long long PTHREAD_RESTART_TIME;
+> extern unsigned long long PTHREAD_ALTLOCK_TIME;
+diff -r libpthread/include/semaphore.h libpthread-spinmod/include/semaphore.h
+58c58
+< extern sem_t *sem_open (const char *__name, int __oflag, ...) __THROW;
+---
+> extern sem_t *sem_open (__const char *__name, int __oflag, ...) __THROW;
+64c64
+< extern int sem_unlink (const char *__name) __THROW;
+---
+> extern int sem_unlink (__const char *__name) __THROW;
+78c78
+< 			  const struct timespec *__restrict __abstime);
+---
+> 			  __const struct timespec *__restrict __abstime);
+diff -r libpthread/src/attr.c libpthread-spinmod/src/attr.c
+33c33,35
+< int __pthread_attr_init(pthread_attr_t *attr)
+---
+> int
+> attribute_hidden
+> __pthread_attr_init(pthread_attr_t *attr)
+35c37
+<   size_t ps = __getpagesize ();
+---
+>   size_t ps = L4_PAGESIZE;
+58c60,62
+< int __pthread_attr_destroy(pthread_attr_t *attr attribute_unused)
+---
+> int
+> attribute_hidden
+> __pthread_attr_destroy(pthread_attr_t *attr)
+64c68,70
+< int __pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
+---
+> int
+> attribute_hidden
+> __pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
+74c80,82
+< int __pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
+---
+> int
+> attribute_hidden
+> __pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
+81c89,91
+< int __pthread_attr_setschedparam(pthread_attr_t *attr,
+---
+> int
+> attribute_hidden
+> __pthread_attr_setschedparam(pthread_attr_t *attr,
+94c104,106
+< int __pthread_attr_getschedparam(const pthread_attr_t *attr,
+---
+> int
+> attribute_hidden
+> __pthread_attr_getschedparam(const pthread_attr_t *attr,
+102c114,116
+< int __pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
+---
+> int
+> attribute_hidden
+> __pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
+112c126,128
+< int __pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
+---
+> int
+> attribute_hidden
+> __pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
+119c135,137
+< int __pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)
+---
+> int
+> attribute_hidden
+> __pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)
+128c146,148
+< int __pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
+---
+> int
+> attribute_hidden
+> __pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
+135c155,157
+< int __pthread_attr_setscope(pthread_attr_t *attr, int scope)
+---
+> int
+> attribute_hidden
+> __pthread_attr_setscope(pthread_attr_t *attr, int scope)
+149c171,173
+< int __pthread_attr_getscope(const pthread_attr_t *attr, int *scope)
+---
+> int
+> attribute_hidden
+> __pthread_attr_getscope(const pthread_attr_t *attr, int *scope)
+156c180,182
+< int __pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+---
+> int
+> attribute_hidden
+> __pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+167c193,195
+< int __pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
+---
+> int
+> attribute_hidden
+> __pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
+200c228,231
+< int __pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+---
+> 
+> int
+> attribute_hidden
+> __pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+217a249,250
+> 
+> #if PTHREAD_STACK_MIN == 16384 || defined __UCLIBC__
+218a252,256
+> #else
+> versioned_symbol (libpthread, __pthread_attr_setstacksize,
+>                   pthread_attr_setstacksize, GLIBC_2_3_3);
+> 
+> # if SHLIB_COMPAT(libpthread, GLIBC_2_1, GLIBC_2_3_3)
+220c258,286
+< int __pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
+---
+> int
+> attribute_hidden
+> __old_pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+> {
+>   /* We have to check against the maximum allowed stack size.  This is no
+>      problem if the manager is already started and we determined it.  If
+>      this hasn't happened, we have to find the limit outself.  */
+>   if (__pthread_max_stacksize == 0)
+>     __pthread_init_max_stacksize ();
+> 
+>   if (stacksize > __pthread_max_stacksize)
+>     return EINVAL;
+> 
+>   /* We don't accept value smaller than old PTHREAD_STACK_MIN.  */
+>   if (stacksize < 16384)
+>     return EINVAL;
+> 
+>   attr->__stacksize = stacksize;
+>   return 0;
+> }
+> compat_symbol (libpthread, __old_pthread_attr_setstacksize,
+> 	       pthread_attr_setstacksize, GLIBC_2_1);
+> # endif
+> #endif
+> 
+> 
+> int
+> attribute_hidden
+> __pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
+227c293,295
+< int __pthread_attr_setstack (pthread_attr_t *attr, void *stackaddr,
+---
+> int
+> attribute_hidden
+> __pthread_attr_setstack (pthread_attr_t *attr, void *stackaddr,
+254a323,352
+> # if SHLIB_COMPAT(libpthread, GLIBC_2_2, GLIBC_2_3_3)
+> int
+> attribute_hidden
+> __old_pthread_attr_setstack (pthread_attr_t *attr, void *stackaddr,
+> 				 size_t stacksize)
+> {
+>   int err;
+> 
+>   if ((((uintptr_t) stackaddr)
+>        & (__alignof__ (struct pthread) - 1)) != 0)
+>     err = EINVAL;
+>   else
+>     err = __old_pthread_attr_setstacksize (attr, stacksize);
+>   if (err == 0)
+>     {
+> #  ifndef _STACK_GROWS_UP
+>       attr->__stackaddr = (char *) stackaddr + stacksize;
+> #  else
+>       attr->__stackaddr = stackaddr;
+> #  endif
+>       attr->__stackaddr_set = 1;
+>     }
+> 
+>   return err;
+> }
+> 
+> compat_symbol (libpthread, __old_pthread_attr_setstack, pthread_attr_setstack,
+>                GLIBC_2_2);
+> 
+> # endif
+257c355,357
+< int __pthread_attr_getstack (const pthread_attr_t *attr, void **stackaddr,
+---
+> int
+> attribute_hidden
+> __pthread_attr_getstack (const pthread_attr_t *attr, void **stackaddr,
+diff -r libpthread/src/barrier.c libpthread-spinmod/src/barrier.c
+17,18c17,19
+<    License along with the GNU C Library; see the file COPYING.LIB.  If
+<    not, see <http://www.gnu.org/licenses/>.  */
+---
+>    License along with the GNU C Library; see the file COPYING.LIB.  If not,
+>    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+>    Boston, MA 02111-1307, USA.  */
+diff -r libpthread/src/cancel.c libpthread-spinmod/src/cancel.c
+17a18
+> #include <libc-internal.h>
+67a69,94
+> 
+> /* The next two functions are similar to pthread_setcanceltype() but
+>    more specialized for the use in the cancelable functions like write().
+>    They do not need to check parameters etc.  */
+> int
+> attribute_hidden
+> __pthread_enable_asynccancel (void)
+> {
+>   pthread_descr self = thread_self();
+>   int oldtype = THREAD_GETMEM(self, p_canceltype);
+>   THREAD_SETMEM(self, p_canceltype, PTHREAD_CANCEL_ASYNCHRONOUS);
+>   if (__builtin_expect (THREAD_GETMEM(self, p_canceled), 0) &&
+>       THREAD_GETMEM(self, p_cancelstate) == PTHREAD_CANCEL_ENABLE)
+>     __pthread_do_exit(PTHREAD_CANCELED, CURRENT_STACK_FRAME);
+>   return oldtype;
+> }
+> 
+> void
+> internal_function attribute_hidden
+> __pthread_disable_asynccancel (int oldtype)
+> {
+>   pthread_descr self = thread_self();
+>   THREAD_SETMEM(self, p_canceltype, oldtype);
+> }
+> 
+> 
+275a303,308
+> 
+> #ifdef __UCLIBC_HAS_RPC__
+>   /* And the TSD which needs special help.  */
+>   if (THREAD_GETMEM(self, p_libc_specific[_LIBC_TSD_KEY_RPC_VARS]) != NULL)
+>       __rpc_thread_destroy ();
+> #endif
+diff -r libpthread/src/condvar.c libpthread-spinmod/src/condvar.c
+19d18
+< #include <sched.h>
+31c30
+<                         const pthread_condattr_t *cond_attr attribute_unused)
+---
+>                         const pthread_condattr_t *cond_attr)
+53c52
+<   volatile pthread_descr self = thread_self();
+---
+>   __volatile__ pthread_descr self = thread_self();
+68c67
+<   volatile pthread_descr self = thread_self();
+---
+>   __volatile__ pthread_descr self = thread_self();
+290c289
+< __pthread_condattr_init(pthread_condattr_t *attr attribute_unused)
+---
+> __pthread_condattr_init(pthread_condattr_t *attr)
+298c297
+< __pthread_condattr_destroy(pthread_condattr_t *attr attribute_unused)
+---
+> __pthread_condattr_destroy(pthread_condattr_t *attr)
+304c303
+< int pthread_condattr_getpshared (const pthread_condattr_t *attr attribute_unused, int *pshared)
+---
+> int pthread_condattr_getpshared (const pthread_condattr_t *attr, int *pshared)
+310c309
+< int pthread_condattr_setpshared (pthread_condattr_t *attr attribute_unused, int pshared)
+---
+> int pthread_condattr_setpshared (pthread_condattr_t *attr, int pshared)
+diff -r libpthread/src/internals.h libpthread-spinmod/src/internals.h
+277a278,289
+> extern int __librt_multiple_threads;
+> 
+> /* Debugging */
+> 
+> #ifdef DEBUG
+> #include <assert.h>
+> #define ASSERT assert
+> #define MSG __pthread_message
+> #else
+> #define ASSERT(x)
+> #define MSG(msg,arg...)
+> #endif
+283a296,297
+> 
+> 
+409c423
+< 				 const pthread_mutexattr_t *__mutex_attr);
+---
+> 				 __const pthread_mutexattr_t *__mutex_attr);
+443c457
+< 					 const struct timespec *__restrict
+---
+> 					 __const struct timespec *__restrict
+446c460
+< 					 const struct timespec *__restrict
+---
+> 					 __const struct timespec *__restrict
+450c464
+< extern int __pthread_barrierattr_getpshared (const pthread_barrierattr_t *
+---
+> extern int __pthread_barrierattr_getpshared (__const pthread_barrierattr_t *
+504a519,531
+> /* Cancellation.  */
+> extern int __pthread_enable_asynccancel (void) L4_HIDDEN;
+> extern void __pthread_disable_asynccancel (int oldtype)
+>   internal_function L4_HIDDEN;
+> 
+> /* The two functions are in libc.so and not exported.  */
+> extern int __libc_enable_asynccancel (void) L4_HIDDEN;
+> extern void __libc_disable_asynccancel (int oldtype)
+>   internal_function L4_HIDDEN;
+> 
+> /* The two functions are in libc.so and are exported.  */
+> extern int __librt_enable_asynccancel (void);
+> extern void __librt_disable_asynccancel (int oldtype) internal_function;
+diff -r libpthread/src/libc_pthread_init.c libpthread-spinmod/src/libc_pthread_init.c
+29a30
+> strong_alias (__libc_multiple_threads, __librt_multiple_threads)
+diff -r libpthread/src/Makefile libpthread-spinmod/src/Makefile
+17c17
+< DIR_arm64 := aarch64
+---
+> DIR_arm64 := arm64
+20d19
+< DIR_riscv := riscv
+41c40
+< INCDIR-arm64 = $(SRC_DIR)/sysdeps/aarch64
+---
+> INCDIR-arm64 = $(SRC_DIR)/sysdeps/arm64
+45d43
+< INCDIR-riscv = $(SRC_DIR)/sysdeps/riscv
+61d58
+< DEFINES_riscv-l4f := -DUSE___THREAD=1
+diff -r libpthread/src/manager.cc libpthread-spinmod/src/manager.cc
+472d471
+< #ifdef CONFIG_MMU
+504,527d502
+<       L4::Cap<L4Re::Dataspace> ds = L4Re::Util::cap_alloc.alloc<L4Re::Dataspace>();
+<       if (!ds.is_valid())
+<         return -1;
+< 
+<       err = e->mem_alloc()->alloc(stacksize, ds);
+<       if (err < 0)
+<         {
+<           L4Re::Util::cap_alloc.free(ds);
+<           return -1;
+<         }
+< 
+<       err = e->rm()->attach(&map_addr, stacksize,
+<                             L4Re::Rm::F::Search_addr | L4Re::Rm::F::RW,
+<                             L4::Ipc::make_cap_rw(ds), 0);
+<       if (err < 0)
+<         {
+<           L4Re::Util::cap_alloc.free(ds, L4Re::This_task);
+<           return -1;
+<         }
+< 
+<       guardaddr = static_cast<char *>(map_addr) - guardsize;
+<       new_thread_bottom = static_cast<char *>(map_addr);
+< #endif
+< #else
+662,663d636
+< #ifdef CONFIG_MMU
+<   // On MMU systems, user space chooses the spot in the virtual address space.
+674,688d646
+< #else
+<   // On systems without MMU the kernel determines the actual location.
+<   l4_fpage_t fp = l4_fpage(0, L4_PAGESHIFT, L4_FPAGE_RW);
+<   if (l4_error(e->task()->add_ku_mem(&fp)))
+<     return nullptr;
+<   kumem = l4_fpage_memaddr(fp);
+< 
+<   // The kernel allocated the address so it is known to be valid. The
+<   // reservation should never fail, unless something is really broken.
+<   long err = e->rm()->reserve_area(&kumem, L4_PAGESIZE, Rm::F::Reserved);
+<   if (err < 0)
+<     fprintf(stderr,
+<             "ERROR: could not reserve ku_mem area, reserve_area returned %ld\n",
+<             err);
+< #endif
+976a935
+>   ASSERT(th->p_exited);
+980c939
+<   assert(th->p_tid != NULL);
+---
+>   ASSERT(th->p_tid != NULL);
+1063c1022
+<   assert(th->p_terminated);
+---
+>   ASSERT(th->p_terminated);
+1199c1158
+< void __pthread_manager_sighandler(int sig attribute_unused)
+---
+> void __pthread_manager_sighandler(int sig)
+diff -r libpthread/src/mutex.c libpthread-spinmod/src/mutex.c
+28a29
+> #include "stdio.h"
+111a113
+>     ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
+114a117
+>     ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
+123a127
+>     ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
+129a134
+>     ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
+191a197
+>     ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
+194a201
+>     ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
+204a212
+>     ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
+210a219
+>     ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
+230c239
+< __pthread_mutexattr_destroy(pthread_mutexattr_t *attr attribute_unused)
+---
+> __pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
+265c274
+< __pthread_mutexattr_getpshared (const pthread_mutexattr_t *attr attribute_unused,
+---
+> __pthread_mutexattr_getpshared (const pthread_mutexattr_t *attr,
+275c284
+< __pthread_mutexattr_setpshared (pthread_mutexattr_t *attr attribute_unused, int pshared)
+---
+> __pthread_mutexattr_setpshared (pthread_mutexattr_t *attr, int pshared)
+diff -r libpthread/src/ptcleanup.c libpthread-spinmod/src/ptcleanup.c
+17a18,21
+> #if ! (defined(ARCH_arm) || defined(ARCH_arm64))
+> #define NO_PTR_DEMANGLE
+> #endif
+> 
+21a26,43
+> #ifndef NO_PTR_DEMANGLE
+> #define __JMPBUF_UNWINDS(a,b,c) _JMPBUF_UNWINDS(a,b,c)
+> #else
+> #define __JMPBUF_UNWINDS(a,b,c) _JMPBUF_UNWINDS(a,b)
+> #endif
+> 
+> #ifndef NO_PTR_DEMANGLE
+> static __inline__ uintptr_t
+> demangle_ptr (uintptr_t x)
+> {
+> #ifdef PTR_DEMANGLE
+>   PTR_DEMANGLE (x);
+> #endif
+>   return x;
+> }
+> #else
+> #define demangle_ptr(x) x
+> #endif
+31c53
+<        c != NULL && _JMPBUF_UNWINDS(target, c);
+---
+>        c != NULL && __JMPBUF_UNWINDS(target, c, demangle_ptr);
+54c76,77
+<       && _JMPBUF_UNWINDS(target, THREAD_GETMEM(self, p_in_sighandler)))
+---
+>       && __JMPBUF_UNWINDS(target, THREAD_GETMEM(self, p_in_sighandler),
+> 			 demangle_ptr))
+diff -r libpthread/src/pthread.c libpthread-spinmod/src/pthread.c
+43a44,51
+> unsigned long long PTHREAD_LOOP_CYCLES;
+> unsigned long long PTHREAD_LOCK_CALLS[4];
+> unsigned long long PTHREAD_UNLOCK_CALLS[4];
+> unsigned long long PTHREAD_LOOP_RETRIES;
+> unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
+> unsigned long long PTHREAD_RESTART_TIME;
+> unsigned long long PTHREAD_ALTLOCK_TIME;
+> 
+664,665c672,673
+<   unsigned int rtld_lock_count = GL(dl_load_lock).__m_count;
+<   GL(dl_load_lock).__m_count = 0;
+---
+>   unsigned int rtld_lock_count = GL(dl_load_lock).mutex.__m_count;
+>   GL(dl_load_lock).mutex.__m_count = 0;
+667c675
+<     __pthread_mutex_lock (&GL(dl_load_lock));
+---
+>     __pthread_mutex_lock (&GL(dl_load_lock).mutex);
+diff -r libpthread/src/queue.h libpthread-spinmod/src/queue.h
+23a24
+>   ASSERT(th->p_nextwaiting == NULL);
+diff -r libpthread/src/restart.h libpthread-spinmod/src/restart.h
+19d18
+< #include <l4/util/util.h>
+22a22,23
+> #include <stdio.h>
+> #include <l4/util/util.h>
+29c30
+<   // l4_usleep(100000);
+---
+>   // l4_usleep(5);
+33a35,36
+>   // printf("IPC send at %llu\n", __builtin_ia32_rdtsc ());
+>   // 
+diff -r libpthread/src/rwlock.c libpthread-spinmod/src/rwlock.c
+607c607
+< __pthread_rwlockattr_destroy (pthread_rwlockattr_t *attr attribute_unused)
+---
+> __pthread_rwlockattr_destroy (pthread_rwlockattr_t *attr)
+diff -r libpthread/src/semaphore.c libpthread-spinmod/src/semaphore.c
+193c193
+< sem_t *sem_open(const char *name attribute_unused, int oflag attribute_unused, ...)
+---
+> sem_t *sem_open(const char *name, int oflag, ...)
+199c199
+< int sem_close(sem_t *sem attribute_unused)
+---
+> int sem_close(sem_t *sem)
+205c205
+< int sem_unlink(const char *name attribute_unused)
+---
+> int sem_unlink(const char *name)
+Only in libpthread/src: so_init-riscv.S
+diff -r libpthread/src/specific.c libpthread-spinmod/src/specific.c
+202a203,234
+> #if !(USE_TLS && HAVE___THREAD)
+> 
+> /* Thread-specific data for libc. */
+> 
+> int
+> attribute_hidden
+> __pthread_internal_tsd_set (int key, const void * pointer)
+> {
+>   pthread_descr self = thread_self();
+> 
+>   THREAD_SETMEM_NC(self, p_libc_specific, key, (void *) pointer);
+>   return 0;
+> }
+> 
+> void *
+> attribute_hidden
+> __pthread_internal_tsd_get (int key)
+> {
+>   pthread_descr self = thread_self();
+> 
+>   return THREAD_GETMEM_NC(self, p_libc_specific, key);
+> }
+> 
+> void ** __attribute__ ((__const__))
+> attribute_hidden
+> __pthread_internal_tsd_address (int key)
+> {
+>   pthread_descr self = thread_self();
+>   return &self->p_libc_specific[key];
+> }
+> 
+> #endif
+diff -r libpthread/src/spinlock.c libpthread-spinmod/src/spinlock.c
+18c18
+< #include <sched.h>
+---
+> //l4/#include <sched.h>
+26a27,28
+> #include <l4/sys/thread.h>
+> #include <l4/util/util.h>
+64,73c66,75
+< #if defined HAS_COMPARE_AND_SWAP
+<   long oldstatus, newstatus;
+<   int successful_seizure, spurious_wakeup_count;
+<   int spin_count;
+< #endif
+< 
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<   if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+---
+> // #if defined HAS_COMPARE_AND_SWAP
+> //   long oldstatus, newstatus;
+> //   int successful_seizure, spurious_wakeup_count;
+> //   int spin_count;
+> // #endif
+> 
+> // #if defined TEST_FOR_COMPARE_AND_SWAP
+> //   if (!__pthread_has_cas)
+> // #endif
+> // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+78,114c80
+< #endif
+< 
+< #if defined HAS_COMPARE_AND_SWAP
+<   /* First try it without preparation.  Maybe it's a completely
+<      uncontested lock.  */
+<   if (lock->__status == 0 && __compare_and_swap (&lock->__status, 0, 1))
+<     return;
+< 
+<   spurious_wakeup_count = 0;
+<   spin_count = 0;
+< 
+<   /* On SMP, try spinning to get the lock. */
+< 
+<   if (__pthread_smp_kernel) {
+<     int max_count = lock->__spinlock * 2 + 10;
+< 
+<     if (max_count > MAX_ADAPTIVE_SPIN_COUNT)
+<       max_count = MAX_ADAPTIVE_SPIN_COUNT;
+< 
+<     for (spin_count = 0; spin_count < max_count; spin_count++) {
+<       if (((oldstatus = lock->__status) & 1) == 0) {
+< 	if(__compare_and_swap(&lock->__status, oldstatus, oldstatus | 1))
+< 	{
+< 	  if (spin_count)
+< 	    lock->__spinlock += (spin_count - lock->__spinlock) / 8;
+< 	  READ_MEMORY_BARRIER();
+< 	  return;
+< 	}
+<       }
+< #ifdef BUSY_WAIT_NOP
+<       BUSY_WAIT_NOP;
+< #endif
+<       __asm__ __volatile__ ("" : "=m" (lock->__status) : "m" (lock->__status));
+<     }
+< 
+<     lock->__spinlock += (spin_count - lock->__spinlock) / 8;
+<   }
+---
+> // #endif
+116c82,164
+< again:
+---
+> // #if defined HAS_COMPARE_AND_SWAP
+> //   /* First try it without preparation.  Maybe it's a completely
+> //      uncontested lock.  */
+> //   if (lock->__status == 0 && __compare_and_swap (&lock->__status, 0, 1))
+> //     return;
+> 
+> //   spurious_wakeup_count = 0;
+> //   spin_count = 0;
+> 
+> //   /* On SMP, try spinning to get the lock. */
+> 
+> //   if (__pthread_smp_kernel) {
+> //     int max_count = lock->__spinlock * 2 + 10;
+> 
+> //     if (max_count > MAX_ADAPTIVE_SPIN_COUNT)
+> //       max_count = MAX_ADAPTIVE_SPIN_COUNT;
+> 
+> //     for (spin_count = 0; spin_count < max_count; spin_count++) {
+> //       if (((oldstatus = lock->__status) & 1) == 0) {
+> // 	if(__compare_and_swap(&lock->__status, oldstatus, oldstatus | 1))
+> // 	{
+> // 	  if (spin_count)
+> // 	    lock->__spinlock += (spin_count - lock->__spinlock) / 8;
+> // 	  READ_MEMORY_BARRIER();
+> // 	  return;
+> // 	}
+> //       }
+> // #ifdef BUSY_WAIT_NOP
+> //       BUSY_WAIT_NOP;
+> // #endif
+> //       __asm__ __volatile__ ("" : "=m" (lock->__status) : "m" (lock->__status));
+> //     }
+> 
+> //     lock->__spinlock += (spin_count - lock->__spinlock) / 8;
+> //   }
+> 
+> // again:
+> 
+> //   /* No luck, try once more or suspend. */
+> 
+> //   do {
+> //     oldstatus = lock->__status;
+> //     successful_seizure = 0;
+> 
+> //     if ((oldstatus & 1) == 0) {
+> //       newstatus = oldstatus | 1;
+> //       successful_seizure = 1;
+> //     } else {
+> //       if (self == NULL)
+> // 	self = thread_self();
+> //       newstatus = (long) self | 1;
+> //     }
+> 
+> //     if (self != NULL) {
+> //       THREAD_SETMEM(self, p_nextlock, (pthread_descr) (oldstatus));
+> //       /* Make sure the store in p_nextlock completes before performing
+> //          the compare-and-swap */
+> //       MEMORY_BARRIER();
+> //     }
+> //   } while(! __compare_and_swap(&lock->__status, oldstatus, newstatus));
+> 
+> //   /* Suspend with guard against spurious wakeup.
+> //      This can happen in pthread_cond_timedwait_relative, when the thread
+> //      wakes up due to timeout and is still on the condvar queue, and then
+> //      locks the queue to remove itself. At that point it may still be on the
+> //      queue, and may be resumed by a condition signal. */
+> 
+> //   if (!successful_seizure) {
+> //     for (;;) {
+> //       suspend(self);
+> //       if (self->p_nextlock != NULL) {
+> // 	/* Count resumes that don't belong to us. */
+> // 	spurious_wakeup_count++;
+> // 	continue;
+> //       }
+> //       break;
+> //     }
+> //     goto again;
+> //   }
+> 
+> //   /* Put back any resumes we caught that don't belong to us. */
+> //   while (spurious_wakeup_count--)
+> //     restart(self);
+118,165c166,167
+<   /* No luck, try once more or suspend. */
+< 
+<   do {
+<     oldstatus = lock->__status;
+<     successful_seizure = 0;
+< 
+<     if ((oldstatus & 1) == 0) {
+<       newstatus = oldstatus | 1;
+<       successful_seizure = 1;
+<     } else {
+<       if (self == NULL)
+< 	self = thread_self();
+<       newstatus = (long) self | 1;
+<     }
+< 
+<     if (self != NULL) {
+<       THREAD_SETMEM(self, p_nextlock, (pthread_descr) (oldstatus));
+<       /* Make sure the store in p_nextlock completes before performing
+<          the compare-and-swap */
+<       MEMORY_BARRIER();
+<     }
+<   } while(! __compare_and_swap(&lock->__status, oldstatus, newstatus));
+< 
+<   /* Suspend with guard against spurious wakeup.
+<      This can happen in pthread_cond_timedwait_relative, when the thread
+<      wakes up due to timeout and is still on the condvar queue, and then
+<      locks the queue to remove itself. At that point it may still be on the
+<      queue, and may be resumed by a condition signal. */
+< 
+<   if (!successful_seizure) {
+<     for (;;) {
+<       suspend(self);
+<       if (self->p_nextlock != NULL) {
+< 	/* Count resumes that don't belong to us. */
+< 	spurious_wakeup_count++;
+< 	continue;
+<       }
+<       break;
+<     }
+<     goto again;
+<   }
+< 
+<   /* Put back any resumes we caught that don't belong to us. */
+<   while (spurious_wakeup_count--)
+<     restart(self);
+< 
+<   READ_MEMORY_BARRIER();
+< #endif
+---
+> //   READ_MEMORY_BARRIER();
+> // #endif
+170,179c172,181
+< #if defined HAS_COMPARE_AND_SWAP
+<   long oldstatus;
+<   pthread_descr thr, * ptr, * maxptr;
+<   int maxprio;
+< #endif
+< 
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<   if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+---
+> // #if defined HAS_COMPARE_AND_SWAP
+> //   long oldstatus;
+> //   pthread_descr thr, * ptr, * maxptr;
+> //   int maxprio;
+> // #endif
+> 
+> // #if defined TEST_FOR_COMPARE_AND_SWAP
+> //   if (!__pthread_has_cas)
+> // #endif
+> // #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+180a183
+>     // PTHREAD_LOOP_CYCLES =40;
+184,247c187
+< #endif
+< 
+< #if defined HAS_COMPARE_AND_SWAP
+<   WRITE_MEMORY_BARRIER();
+< 
+< again:
+<   oldstatus = lock->__status;
+<   if (oldstatus == 0 || oldstatus == 1) {
+<     /* No threads are waiting for this lock.  Please note that we also
+<        enter this case if the lock is not taken at all.  If this wouldn't
+<        be done here we would crash further down.  */
+<     if (! __compare_and_swap_with_release_semantics(&lock->__status,
+< 	oldstatus, 0))
+<       goto again;
+< 
+<     return 0;
+<   }
+< 
+<   /* Find thread in waiting queue with maximal priority */
+<   ptr = (pthread_descr *) &lock->__status;
+<   thr = (pthread_descr) (oldstatus & ~1L);
+<   maxprio = 0;
+<   maxptr = ptr;
+< 
+<   /* Before we iterate over the wait queue, we need to execute
+<      a read barrier, otherwise we may read stale contents of nodes that may
+<      just have been inserted by other processors. One read barrier is enough to
+<      ensure we have a stable list; we don't need one for each pointer chase
+<      through the list, because we are the owner of the lock; other threads
+<      can only add nodes at the front; if a front node is consistent,
+<      the ones behind it must also be. */
+< 
+<   READ_MEMORY_BARRIER();
+< 
+<   while (thr != 0) {
+<     if (thr->p_priority >= maxprio) {
+<       maxptr = ptr;
+<       maxprio = thr->p_priority;
+<     }
+<     ptr = &(thr->p_nextlock);
+<     thr = (pthread_descr)((long)(thr->p_nextlock) & ~1L);
+<   }
+< 
+<   /* Remove max prio thread from waiting list. */
+<   if (maxptr == (pthread_descr *) &lock->__status) {
+<     /* If max prio thread is at head, remove it with compare-and-swap
+<        to guard against concurrent lock operation. This removal
+<        also has the side effect of marking the lock as released
+<        because the new status comes from thr->p_nextlock whose
+<        least significant bit is clear. */
+<     thr = (pthread_descr) (oldstatus & ~1L);
+<     if (! __compare_and_swap_with_release_semantics
+< 	    (&lock->__status, oldstatus, (long)(thr->p_nextlock) & ~1L))
+<       goto again;
+<   } else {
+<     /* No risk of concurrent access, remove max prio thread normally.
+<        But in this case we must also flip the least significant bit
+<        of the status to mark the lock as released. */
+<     thr = (pthread_descr)((long)*maxptr & ~1L);
+<     *maxptr = thr->p_nextlock;
+< 
+<     /* Ensure deletion from linked list completes before we
+<        release the lock. */
+<     WRITE_MEMORY_BARRIER();
+---
+> // #endif
+249,253c189,190
+<     do {
+<       oldstatus = lock->__status;
+<     } while (!__compare_and_swap_with_release_semantics(&lock->__status,
+< 	     oldstatus, oldstatus & ~1L));
+<   }
+---
+> // #if defined HAS_COMPARE_AND_SWAP
+> //   WRITE_MEMORY_BARRIER();
+255,258c192,255
+<   /* Wake up the selected waiting thread. Woken thread can check
+<      its own p_nextlock field for NULL to detect that it has been removed. No
+<      barrier is needed here, since restart() and suspend() take
+<      care of memory synchronization. */
+---
+> // again:
+> //   while ((oldstatus = lock->__status) == 1) {
+> //     if (__compare_and_swap_with_release_semantics(&lock->__status,
+> // 	oldstatus, 0))
+> //       return 0;
+> //   }
+> 
+> //   /* Find thread in waiting queue with maximal priority */
+> //   ptr = (pthread_descr *) &lock->__status;
+> //   thr = (pthread_descr) (oldstatus & ~1L);
+> //   maxprio = 0;
+> //   maxptr = ptr;
+> 
+> //   /* Before we iterate over the wait queue, we need to execute
+> //      a read barrier, otherwise we may read stale contents of nodes that may
+> //      just have been inserted by other processors. One read barrier is enough to
+> //      ensure we have a stable list; we don't need one for each pointer chase
+> //      through the list, because we are the owner of the lock; other threads
+> //      can only add nodes at the front; if a front node is consistent,
+> //      the ones behind it must also be. */
+> 
+> //   READ_MEMORY_BARRIER();
+> 
+> //   while (thr != 0) {
+> //     if (thr->p_priority >= maxprio) {
+> //       maxptr = ptr;
+> //       maxprio = thr->p_priority;
+> //     }
+> //     ptr = &(thr->p_nextlock);
+> //     thr = (pthread_descr)((long)(thr->p_nextlock) & ~1L);
+> //   }
+> 
+> //   /* Remove max prio thread from waiting list. */
+> //   if (maxptr == (pthread_descr *) &lock->__status) {
+> //     /* If max prio thread is at head, remove it with compare-and-swap
+> //        to guard against concurrent lock operation. This removal
+> //        also has the side effect of marking the lock as released
+> //        because the new status comes from thr->p_nextlock whose
+> //        least significant bit is clear. */
+> //     thr = (pthread_descr) (oldstatus & ~1L);
+> //     if (! __compare_and_swap_with_release_semantics
+> // 	    (&lock->__status, oldstatus, (long)(thr->p_nextlock) & ~1L))
+> //       goto again;
+> //   } else {
+> //     /* No risk of concurrent access, remove max prio thread normally.
+> //        But in this case we must also flip the least significant bit
+> //        of the status to mark the lock as released. */
+> //     thr = (pthread_descr)((long)*maxptr & ~1L);
+> //     *maxptr = thr->p_nextlock;
+> 
+> //     /* Ensure deletion from linked list completes before we
+> //        release the lock. */
+> //     WRITE_MEMORY_BARRIER();
+> 
+> //     do {
+> //       oldstatus = lock->__status;
+> //     } while (/*!__compare_and_swap_with_release_semantics(&lock->__status,
+> // 	     oldstatus, oldstatus & ~1L)*/0);
+> //   }
+> 
+> //   /* Wake up the selected waiting thread. Woken thread can check
+> //      its own p_nextlock field for NULL to detect that it has been removed. No
+> //      barrier is needed here, since restart() and suspend() take
+> //      care of memory synchronization. */
+260,261c257,258
+<   thr->p_nextlock = NULL;
+<   restart(thr);
+---
+> //   thr->p_nextlock = NULL;
+> //   restart(thr);
+263,264c260,261
+<   return 0;
+< #endif
+---
+> //   return 0;
+> // #endif
+274a272,277
+> inline unsigned long long time_diff_to_ns(struct timespec* start, struct timespec* end) {
+>   if (end->tv_nsec > start->tv_nsec)
+>     return (end->tv_sec - start->tv_sec) * 1000000000 + (end->tv_nsec - start->tv_nsec);
+>   else 
+>     return (end->tv_sec - start->tv_sec - 1) * 1000000000 + (1000000000 + end->tv_nsec - start->tv_nsec);
+> }
+322c325
+< #if defined HAS_COMPARE_AND_SWAP
+---
+> // #if defined HAS_COMPARE_AND_SWAP
+324,339c327,363
+< /* Remove a wait node from the specified queue.  It is assumed
+<    that the removal takes place concurrently with only atomic insertions at the
+<    head of the queue. */
+< 
+< static void wait_node_dequeue(struct wait_node **pp_head,
+< 			      struct wait_node **pp_node,
+< 			      struct wait_node *p_node)
+< {
+<   /* If the node is being deleted from the head of the
+<      list, it must be deleted using atomic compare-and-swap.
+<      Otherwise it can be deleted in the straightforward way. */
+< 
+<   if (pp_node == pp_head) {
+<     /* We don't need a read barrier between these next two loads,
+<        because it is assumed that the caller has already ensured
+<        the stability of *p_node with respect to p_node. */
+---
+> // /* Remove a wait node from the specified queue.  It is assumed
+> //    that the removal takes place concurrently with only atomic insertions at the
+> //    head of the queue. */
+> 
+> // static void wait_node_dequeue(struct wait_node **pp_head,
+> // 			      struct wait_node **pp_node,
+> // 			      struct wait_node *p_node)
+> // {
+> //   /* If the node is being deleted from the head of the
+> //      list, it must be deleted using atomic compare-and-swap.
+> //      Otherwise it can be deleted in the straightforward way. */
+> 
+> //   if (pp_node == pp_head) {
+> //     /* We don't need a read barrier between these next two loads,
+> //        because it is assumed that the caller has already ensured
+> //        the stability of *p_node with respect to p_node. */
+> 
+> //     long oldvalue = (long) p_node;
+> //     long newvalue = (long) p_node->next;
+> 
+> //     if (__compare_and_swap((long *) pp_node, oldvalue, newvalue))
+> //       return;
+> 
+> //     /* Oops! Compare and swap failed, which means the node is
+> //        no longer first. We delete it using the ordinary method.  But we don't
+> //        know the identity of the node which now holds the pointer to the node
+> //        being deleted, so we must search from the beginning. */
+> 
+> //     for (pp_node = pp_head; p_node != *pp_node; ) {
+> //       pp_node = &(*pp_node)->next;
+> //       READ_MEMORY_BARRIER(); /* Stabilize *pp_node for next iteration. */
+> //     }
+> //   }
+> 
+> //   *pp_node = p_node->next;
+> //   return;
+> // }
+341,362c365
+<     long oldvalue = (long) p_node;
+<     long newvalue = (long) p_node->next;
+< 
+<     if (__compare_and_swap((long *) pp_node, oldvalue, newvalue))
+<       return;
+< 
+<     /* Oops! Compare and swap failed, which means the node is
+<        no longer first. We delete it using the ordinary method.  But we don't
+<        know the identity of the node which now holds the pointer to the node
+<        being deleted, so we must search from the beginning. */
+< 
+<     for (pp_node = pp_head; p_node != *pp_node; ) {
+<       pp_node = &(*pp_node)->next;
+<       READ_MEMORY_BARRIER(); /* Stabilize *pp_node for next iteration. */
+<     }
+<   }
+< 
+<   *pp_node = p_node->next;
+<   return;
+< }
+< 
+< #endif
+---
+> // #endif
+367,369d369
+< #if defined HAS_COMPARE_AND_SWAP
+<   long oldstatus, newstatus;
+< #endif
+371,375c371,372
+< 
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<   if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+---
+>   struct timespec te, ts; 
+>   clock_gettime(CLOCK_MONOTONIC, &ts);
+384c381
+< 	self = thread_self();
+---
+> 	    self = thread_self();
+395c392,394
+<     if (suspend_needed)
+---
+>     clock_gettime(CLOCK_MONOTONIC, &te);
+>     PTHREAD_ALTLOCK_TIME += time_diff_to_ns(&ts, &te);
+>     if (suspend_needed){
+396a396,397
+>     }
+>     // __pthread_lock(lock, self);
+399,428d399
+< #endif
+< 
+< #if defined HAS_COMPARE_AND_SWAP
+<   do {
+<     oldstatus = lock->__status;
+<     if (oldstatus == 0) {
+<       newstatus = 1;
+<     } else {
+<       if (self == NULL)
+< 	self = thread_self();
+<       wait_node.thr = self;
+<       newstatus = (long) &wait_node;
+<     }
+<     wait_node.abandoned = 0;
+<     wait_node.next = (struct wait_node *) oldstatus;
+<     /* Make sure the store in wait_node.next completes before performing
+<        the compare-and-swap */
+<     MEMORY_BARRIER();
+<   } while(! __compare_and_swap(&lock->__status, oldstatus, newstatus));
+< 
+<   /* Suspend. Note that unlike in __pthread_lock, we don't worry
+<      here about spurious wakeup. That's because this lock is not
+<      used in situations where that can happen; the restart can
+<      only come from the previous lock owner. */
+< 
+<   if (oldstatus != 0)
+<     suspend(self);
+< 
+<   READ_MEMORY_BARRIER();
+< #endif
+522a494
+>   // __pthread_unlock(lock);
+527c499,501
+<   WRITE_MEMORY_BARRIER();
+---
+>   unsigned long long retires = 0;
+>   unsigned long long cycles = 0;
+>   struct timespec ts, te; 
+529,536c503
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<   if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+<   {
+<     __pthread_acquire(&lock->__spinlock);
+<   }
+< #endif
+---
+>   WRITE_MEMORY_BARRIER();
+537a505,506
+>   clock_gettime(CLOCK_MONOTONIC, &ts);
+>   __pthread_acquire(&lock->__spinlock);
+539d507
+< 
+542,545d509
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<     if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+548,549c512,513
+< 	lock->__status = 0;
+< 	break;
+---
+> 	      lock->__status = 0;
+> 	      break;
+552,569d515
+< #endif
+< 
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<     else
+< #endif
+< 
+< #if defined HAS_COMPARE_AND_SWAP
+<     {
+<       long oldstatus = lock->__status;
+<       if (oldstatus == 0 || oldstatus == 1) {
+< 	if (__compare_and_swap_with_release_semantics (&lock->__status, oldstatus, 0))
+< 	  break;
+< 	else
+< 	  continue;
+<       }
+<     }
+< #endif
+< 
+580d525
+< 
+581a527
+>       ++cycles;
+583d528
+< 
+585,612c530,546
+< 	/* Remove abandoned node. */
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+< 	if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+< 	  *pp_node = p_node->next;
+< #endif
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+< 	else
+< #endif
+< #if defined HAS_COMPARE_AND_SWAP
+< 	  wait_node_dequeue(pp_head, pp_node, p_node);
+< #endif
+< 	wait_node_free(p_node);
+< 	/* Note that the next assignment may take us to the beginning
+< 	   of the queue, to newly inserted nodes, if pp_node == pp_head.
+< 	   In that case we need a memory barrier to stabilize the first of
+< 	   these new nodes. */
+< 	p_node = *pp_node;
+< 	if (pp_node == pp_head)
+< 	  READ_MEMORY_BARRIER(); /* No stale reads through p_node */
+< 	continue;
+<       } else if ((prio = p_node->thr->p_priority) >= maxprio) {
+< 	/* Otherwise remember it if its thread has a higher or equal priority
+< 	   compared to that of any node seen thus far. */
+< 	maxprio = prio;
+< 	pp_max_prio = pp_node;
+< 	p_max_prio = p_node;
+---
+>     	  *pp_node = p_node->next;
+>       	// wait_node_free(p_node);
+>         /* Note that the next assignment may take us to the beginning
+>         of the queue, to newly inserted nodes, if pp_node == pp_head.
+>         In that case we need a memory barrier to stabilize the first of
+>         these new nodes. */
+>         p_node = *pp_node;
+> 	      if (pp_node == pp_head)
+> 	        // READ_MEMORY_BARRIER(); /* No stale reads through p_node */
+> 	      continue;
+>       } else if (p_node->thr->p_priority >= maxprio) {
+>           prio = p_node->thr->p_priority;
+>           maxprio = prio;
+>           pp_max_prio = pp_node;
+>           p_max_prio = p_node;
+>         /* Otherwise remember it if its thread has a higher or equal priority
+>           compared to that of any node seen thus far. */
+614d547
+< 
+624a558,559
+>     ASSERT (p_max_prio != (struct wait_node *) 1);
+> 
+632,645c567,568
+<     if (!testandset(&p_max_prio->abandoned)) {
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<       if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+< 	*pp_max_prio = p_max_prio->next;
+< #endif
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<       else
+< #endif
+< #if defined HAS_COMPARE_AND_SWAP
+< 	wait_node_dequeue(pp_head, pp_max_prio, p_max_prio);
+< #endif
+< 
+---
+>     if (!testandset(&p_max_prio->abandoned)/*(p_max_prio->abandoned)*/) {
+>     	*pp_max_prio = p_max_prio->next;
+647,654c570,572
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<       if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+< 	{
+< 	  __pthread_release(&lock->__spinlock);
+< 	}
+< #endif
+---
+> 	    __pthread_release(&lock->__spinlock);
+>       clock_gettime(CLOCK_MONOTONIC, &te);
+>       PTHREAD_QUEUE_TRAVERSE_TIME += time_diff_to_ns(&ts, &te);
+655a574
+>       clock_gettime(CLOCK_MONOTONIC, &ts);
+657c576,583
+< 
+---
+>       clock_gettime(CLOCK_MONOTONIC, &te);
+>       PTHREAD_RESTART_TIME += time_diff_to_ns(&ts, &te);
+>       
+>       if (PTHREAD_LOOP_RETRIES < retires)
+>         PTHREAD_LOOP_RETRIES = retires;
+>       if (PTHREAD_LOOP_CYCLES < cycles)
+>         PTHREAD_LOOP_CYCLES = cycles;
+>       // l4_usleep(1);
+659a586
+>     ++retires;
+660a588,593
+>   clock_gettime(CLOCK_MONOTONIC, &te);
+>   PTHREAD_QUEUE_TRAVERSE_TIME += time_diff_to_ns(&ts, &te);
+>   if (PTHREAD_LOOP_RETRIES < retires)
+>       PTHREAD_LOOP_RETRIES = retires;
+>   if (PTHREAD_LOOP_CYCLES < cycles)
+>     PTHREAD_LOOP_CYCLES = cycles;
+662,669c595
+< #if defined TEST_FOR_COMPARE_AND_SWAP
+<   if (!__pthread_has_cas)
+< #endif
+< #if !defined HAS_COMPARE_AND_SWAP || defined TEST_FOR_COMPARE_AND_SWAP
+<   {
+<     __pthread_release(&lock->__spinlock);
+<   }
+< #endif
+---
+>   __pthread_release(&lock->__spinlock);
+722d647
+<   struct timespec tm;
+728c653
+<       sched_yield();
+---
+>       l4_thread_yield();
+731,733c656
+<       tm.tv_sec = 0;
+<       tm.tv_nsec = SPIN_SLEEP_DURATION;
+<       nanosleep(&tm, NULL);
+---
+>       l4_usleep(SPIN_SLEEP_DURATION / 1000);
+736a660,675
+> // while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock){
+> //     __builtin_ia32_pause();
+> // }
+> //   while (1) {
+> //     if ((*spinlock) == __LT_SPINLOCK_INIT) {
+> //       if (!testandset(spinlock))
+> //         break;
+> //     }
+> //     if (cnt < MAX_SPIN_COUNT) {
+> //       l4_thread_yield();
+> //       cnt++;
+> //     } else {
+> //       l4_usleep(SPIN_SLEEP_DURATION / 1000);
+> //       cnt = 0;
+> //     }
+> //   }
+Only in libpthread-spinmod/src: spinlock copy.c
+Only in libpthread/src/sysdeps: aarch64
+diff -r libpthread/src/sysdeps/arm/tls.h libpthread-spinmod/src/sysdeps/arm/tls.h
+29d28
+< # include <l4/sys/utcb.h>
+Only in libpthread-spinmod/src/sysdeps: arm64
+diff -r libpthread/src/sysdeps/generic/dl-tls.c libpthread-spinmod/src/sysdeps/generic/dl-tls.c
+22a23
+> #include <libintl.h>
+67c68
+< void *_dl_memalign(size_t alignment, size_t bytes);
+---
+> 
+70d70
+< 	(void)alignment;
+73a74
+> 
+837c838
+< void _dl_add_to_slotinfo (struct link_map  *l);
+---
+> 
+diff -r libpthread/src/sysdeps/i386/sysdep-cancel.h libpthread-spinmod/src/sysdeps/i386/sysdep-cancel.h
+136a137,138
+> #else
+> # define __local_multiple_threads __librt_multiple_threads
+diff -r libpthread/src/sysdeps/mips/tls.h libpthread-spinmod/src/sysdeps/mips/tls.h
+28c28
+< # include <l4/sys/utcb.h>
+---
+> 
+Only in libpthread/src/sysdeps/powerpc/powerpc32: pspinlock.c
+Only in libpthread/src/sysdeps/powerpc/powerpc64: pspinlock.c
+Only in libpthread/src/sysdeps: riscv
+diff -r libpthread/src/sysdeps/x86_64/pt-machine.h libpthread-spinmod/src/sysdeps/x86_64/pt-machine.h
+67c67,68
+<   __asm__ __volatile__ ("lock; cmpxchgq %3, %1; sete %0"
+---
+>   __asm__ __volatile__ (
+>       "cmp %3, %%rax; jz 1f; lock; cmpxchgq %3, %1; 1: sete %0"
+Only in libpthread/src: tramp-riscv.S

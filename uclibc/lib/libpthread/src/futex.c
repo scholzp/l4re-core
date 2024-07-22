@@ -14,8 +14,11 @@
 	//("TSC %llu: Thread %lu  Line: %lu: %s\n",__builtin_ia32_rdtsc(), thread_self(), __LINE__, msg); \
     // __pthread_release(&out_lock); \
 
-struct futex_node *global_futex_list;
-static int global_futex_sp = 0;
+int global_futex_sp = 0;
+
+struct futex futex_list[MAX_FUTEX_COUNT];
+unsigned long futex_last_used_index;
+unsigned long futex_first_free_index;
 
 void inline __sl_acquire(int *sl) {
     while (!__sync_bool_compare_and_swap((sl), 0, 1)) while (*sl) __builtin_ia32_pause();
@@ -28,231 +31,82 @@ void inline  __sl_release(int * spinlock)
   __asm__ __volatile__ ("" : "=m" (*spinlock) : "m" (*spinlock));
 }
 
-// Simply create a futex and return the pointer
-void create_futex(struct futex **futex) {
-	__sync_synchronize();
-	DEBUG_MSG("Create futex")
-	(*futex) = (struct futex*) malloc(sizeof(struct futex));
-	(*futex)->sleep_queue_head = NULL;
-	(*futex)->sleep_queue_tail = NULL;
-	(*futex)->queue_dirty = 0;
-	(*futex)->spinlock = 0;
-	__sync_synchronize();
-}
-
-// Respective function to clean up memory
-void destroy_futex(struct futex *futex) {
-	__sl_acquire(&global_futex_sp);
-	__sync_synchronize();
-	DEBUG_MSG("destroy futex");
-	if (futex == NULL) {
-		__sl_release(&global_futex_sp);	
-		return;
-	}
-	if (futex->sleep_queue_head) {
-		// Remove all nodes
-		struct wait_node *current = futex->sleep_queue_head;
-		while (current) {
-			// printf("Delete wait_node %p\n", current);
-			struct wait_node *to_free = current;
-			current = current->next;
-			free(to_free); 
+struct wait_node* register_waiter(struct futex* f, pthread_descr descr){
+	for (size_t index = 0; index < MAX_THREADS_PER_FUTEX; ++index) {
+		if (0 == f->wait_queue[index].slot_is_used) {
+			f->wait_queue[index].slot_is_used = 1;
+			f->wait_queue[index].descr = descr;
+			return &f->wait_queue[index];
 		}
 	}
-	free(futex);
-	__sync_synchronize();
-	__sl_release(&global_futex_sp);
-}
-
-void add_wait_node(struct futex *futex, pthread_descr descr){
-	__sync_synchronize();
-	DEBUG_MSG("add_wait_node");
-	if(NULL == futex) {
-		DEBUG_MSG("FUTEX NULL; DONT INSERT NODE");
-		return;
-	}
-	if(NULL == futex->sleep_queue_head) {
-		__sync_synchronize();
-		DEBUG_MSG("CREATE NEW HEAD");
-		futex->sleep_queue_head = (struct wait_node *) malloc(sizeof(*futex->sleep_queue_head));
-		futex->sleep_queue_head->next = NULL;
-		futex->sleep_queue_head->prev = NULL;
-		futex->sleep_queue_head->thr = descr;
-		futex->sleep_queue_tail = futex->sleep_queue_head;
-		__sync_synchronize();
-	} else {
-		if (NULL != (find_wait_node(futex, descr))){
-			return;
-			// printf("Add note a second time!\n");
-		}
-		DEBUG_MSG("Queue length >=2");
-		__sync_synchronize();
-		struct wait_node *new_tail = (struct wait_node*) malloc(sizeof(*new_tail));
-		// printf("Allocated at address %p\n", new_tail);
-		new_tail->thr = descr;
-		new_tail->next = NULL;
-		new_tail->prev = futex->sleep_queue_tail;
-		futex->sleep_queue_tail->next = new_tail;
-		futex->sleep_queue_tail = new_tail;
-		__sync_synchronize();
-	}
-}
-
-struct wait_node *pop_wait_node(struct futex *futex){
-	DEBUG_MSG("Pop head!");
-	if (NULL != futex->sleep_queue_head) {
-		struct wait_node *old_head = futex->sleep_queue_head;
-		futex->sleep_queue_head = futex->sleep_queue_head->next;
-		if (NULL != futex->sleep_queue_head) {
-			DEBUG_MSG("Set prev of head to NULL");
-			futex->sleep_queue_head->prev = NULL;
-		}
-		DEBUG_MSG("Return result");
-		return old_head;
-	} else {
-		DEBUG_MSG("Retrun NULL");
-		return NULL;
-	}
-}
-
-int remove_wait_node(struct futex *futex, pthread_descr descr){
-	__sync_synchronize();
-	DEBUG_MSG("remove_wait_node");
-
-	struct wait_node **to_remove = find_wait_node(futex,  descr);
-	if ((NULL != (to_remove)) && (NULL != (*to_remove))) {
-		struct wait_node *to_free = *to_remove;
-		if (NULL != (*to_remove)->prev) {
-			(*to_remove)->prev->next = to_free->next;
-		}
-		(*to_remove) = to_free->next;
-		free(to_free);
-		return 1;
-	} else {
-		DEBUG_MSG("Nothing removed");
-		return -1;
-	}
-}
-
-struct wait_node **find_wait_node(struct futex *futex, pthread_descr descr) {
-	__sync_synchronize();
-	int pos = 0;
-	DEBUG_MSG("find_wait_node");
-	if (NULL == futex) {
-		DEBUG_MSG("wait_node list not initialized!");
-		return NULL;
-	}
-	if (NULL == futex->sleep_queue_head) {
-		DEBUG_MSG("find_wait_node: Sleep queue head NULL");
-		return NULL;
-	}
-	DEBUG_MSG("Sleep queue head Not null; Enter while...");
-	struct wait_node **current = &futex->sleep_queue_head;
-	while (((*current) != NULL)) {
-		DEBUG_MSG("Iterate through queue.");
-		if ((*current)->thr == descr) {
-			// printf("WAIT_Node at pos %d\n", pos);
-			return current;
-		}
-		current = &((*current)->next);
-		++pos;
-	}
-	DEBUG_MSG("Return NULL");
+	// No free slots, we return an error
 	return NULL;
 }
 
-/*
-* Finds a futex for the given address, if it exists.
-* If it exists, return 1 and the pointer to the futex.
-* If not, return 0 and do nothing with the provided pointer.
-*/ 
-int find_futex(struct futex_node *head, struct futex **futex, uint64_t *address){
-	__sync_synchronize();
-	int result = 0;
-	DEBUG_MSG("find_futex");
-
-	if (NULL != head)
-	{
-		if (head->uaddress == address) {
-			DEBUG_MSG("head");
-			*futex = head->futex;
-			result = 1;
-		} else {
-			struct futex_node *current = head->next; 
-			while (current != head) {
-				if (current->uaddress == address) {
-					*futex = current->futex;
-					result = 1;
-					break;
-				}
-				current = current->next;
-			}
+int register_futex(uint64_t *uaddress, struct futex **out) {
+	int first_free_slot = -1;
+	for (size_t index = 0; index < MAX_FUTEX_COUNT; ++index) {
+		// Find first free slot
+		if ((-1 == first_free_slot) && (0 == futex_list[index].slot_is_used)) {
+			first_free_slot = index;
+		}
+		// Check that no futex for given uaddress exists
+		if (futex_list[index].uaddress == uaddress) {
+			*out = &futex_list[index];
+			return 0;
 		}
 	}
-	else {
-		DEBUG_MSG("FUTEX not found, HEAD NULL")
+	if (first_free_slot != -1) {
+		// We are here because we found a free slot and the address is not yet 
+		// associated to a futex. We allocate the slot.
+		futex_list[first_free_slot].slot_is_used = 1;
+		futex_list[first_free_slot].uaddress = uaddress;
+		*out = &futex_list[first_free_slot];
+		return 1;
 	}
-	DEBUG_MSG("Return futex;");
-	return result;
+	// No free slots, we return an error
+	*out = NULL;
+	return -1;
 }
 
-void add_futex_node(struct futex_node **head, struct futex **futex, uint64_t *address){
-	// Does this futex exist?
-	DEBUG_MSG("add_futex_node");
-	__sync_synchronize();
-	if (find_futex(*head, futex, address))
-		return;
-	else {
-		DEBUG_MSG("Make new futex");
-		create_futex(futex);
-	}
-	// Futex not in the list...
-	if (NULL == (*head)) {
-		DEBUG_MSG("HEad NULL");
-		// No list existing, create one
-		(*head) = (struct futex_node*) malloc(sizeof(**head));
-		(*head)->futex = *futex;
-		(*head)->next = (*head);
-		(*head)->prev = (*head);
-		(*head)->uaddress = address;
-		(*head)->spinlock = 0;
-		DEBUG_MSG("Created new Futex an initialized");
-		__sync_synchronize();
-	} else {
-		DEBUG_MSG("HEAD not NULL");
-		// List existing, Futex need to be added
-		struct futex_node *new_tail = (struct futex_node*) malloc(sizeof(*new_tail));
-		struct futex_node *current_tail = (*head)->prev; 
-		// Attach the new tail the as current tail's successor
-		new_tail->prev = current_tail;
-		new_tail->next = (*head);
-		// Attach the new tail to the head as it's successor
-		(*head)->prev = new_tail;
-		current_tail->next = new_tail;
-		new_tail->futex = *futex;
-		new_tail->uaddress = address;
-		__sync_synchronize();
-	}
-	//WRITE_MEMORY_BARRIER();
-}
-
-// Respective function to clean up memory
-void destroy_futex_list(struct futex_node *head) {
-	__sync_synchronize();
-	__sl_acquire(&global_futex_sp);
-	if (NULL != head) {
-		// Detach the tail node from the head
-		head->prev->next = NULL;
-		// Remove all nodes
-		struct futex_node *current = head;
-		while (current) {
-			struct futex_node *to_free = current;
-			destroy_futex(to_free->futex);
-			current = current->next;
-			free(to_free); 
+int find_futex(uint64_t *uaddress, struct futex **out){
+	for (size_t index = 0; index < MAX_FUTEX_COUNT; ++index) {
+		// Check that no futex for given uaddress exists
+		if (futex_list[index].uaddress == uaddress) {
+			*out = &futex_list[index];
+			return 1;
 		}
 	}
-	__sl_release(&global_futex_sp);
+	// Futex was not found; return an error
+	*out = NULL;
+	return -1;
+};
+
+// Mark the wait node slot of a futex unused
+void free_waite_node(struct wait_node *wn) {
+	wn->descr = 0;
+	wn->slot_is_used = 0;
+}
+
+// Mark the slot unsued; Reset address so no false positives are possible.
+void free_futex(struct futex *f){
+	f->slot_is_used = 0;
+	f->uaddress = 0;
+}
+
+pthread_descr pop_waiter(struct futex *f){
+	for (size_t index = 0; index < MAX_THREADS_PER_FUTEX; ++index) {
+		DEBUG_MSG("Iterate through queue");
+		if (0 != f->wait_queue[index].slot_is_used) {
+			pthread_descr waiting = f->wait_queue[index].descr;
+			f->wait_queue[index].slot_is_used = 0;
+			f->wait_queue[index].descr = 0;
+			return waiting;
+		}
+	}
+	// No free slots, we return an error
+	DEBUG_MSG("..Nothing found");
+	return 0;
 }
 
 /*
@@ -288,7 +142,7 @@ futex_wait(uint64_t *uaddr, uint64_t val, const struct timespec *timeout,
 
 	// __sl_acquire(&global_futex_sp);
 	__sync_synchronize();
-	add_futex_node(&global_futex_list, &f, uaddr);
+	register_futex(uaddr, &f);
 	if(f == NULL) {
 		DEBUG_MSG("FUTEX NULL; DIDNT EXPECT");
 		return EAGAIN;
@@ -296,9 +150,9 @@ futex_wait(uint64_t *uaddr, uint64_t val, const struct timespec *timeout,
 		DEBUG_MSG("FUTEX NOT NULL");
 	}
 	
-	if ((find_wait_node(f, t_descr)) != NULL) {
-		DEBUG_MSG("Already queued!");
-	}
+	// if ((find_wait_node(f, t_descr)) != NULL) {
+	// 	DEBUG_MSG("Already queued!");
+	// }
 
 	// if (timeout != NULL) {
 	// TODO: Timeout stuff
@@ -313,7 +167,7 @@ futex_wait(uint64_t *uaddr, uint64_t val, const struct timespec *timeout,
 
 	__sync_synchronize();
 	DEBUG_MSG("ADD WAIT NODE");
-	add_wait_node(f, t_descr);
+	register_waiter(f, t_descr);
 	__sync_synchronize();
 
 	error = 1;
@@ -339,10 +193,10 @@ futex_wait(uint64_t *uaddr, uint64_t val, const struct timespec *timeout,
 	// 	}
 	// }
 	__sync_synchronize();
-		__sl_release(&global_futex_sp);
-		DEBUG_MSG("Going to sleep!");
-		suspend(t_descr);
-		__sl_acquire(&global_futex_sp);
+	__sl_release(&global_futex_sp);
+	DEBUG_MSG("Going to sleep!");
+	suspend(t_descr);
+	__sl_acquire(&global_futex_sp);
 
 
 
@@ -352,15 +206,15 @@ futex_wait(uint64_t *uaddr, uint64_t val, const struct timespec *timeout,
 
 	/* Remove ourself if we haven't been awaken by another thread. */
 	__sync_synchronize();
-	if ((find_wait_node(f, t_descr)) != NULL) {
-		DEBUG_MSG("Woke up, found my node!");
-		// if (-1 != remove_wait_node(f, t_descr))
-			// DEBUG_MSG("Really did remove the node...");
+	// if ((find_wait_node(f, t_descr)) != NULL) {
+	// 	DEBUG_MSG("Woke up, found my node!");
+	// 	if (-1 != remove_wait_node(f, t_descr))
+	// 		DEBUG_MSG("Really did remove the node...");
 
-		__sync_synchronize();
-		__sl_release(&global_futex_sp);
-		return EAGAIN;
-	}
+	// 	__sync_synchronize();
+	// 	__sl_release(&global_futex_sp);
+	// 	return EAGAIN;
+	// }
 	__sync_synchronize();
 	__sl_release(&global_futex_sp);
 	return error;
@@ -378,16 +232,17 @@ futex_requeue(uint64_t *uaddr, uint64_t n, uint64_t *uaddr2, uint64_t m,
 	__sl_acquire(&global_futex_sp);
 	DEBUG_MSG("futex_requeue");
 	struct futex *f = NULL, *g = NULL;
-	struct wait_node *current;
 	unsigned long count = 0;
 
 	__sync_synchronize();
 	__sync_synchronize();
-	find_futex(global_futex_list, &f, uaddr);
+	find_futex(uaddr, &f);
 
 	if (f == NULL) {
 		// printf("Wake. FUTEX NULL!\n");
 		__sl_release(&global_futex_sp);
+		// if (downs != ups)
+			// printf("Empty queue\n");
 		DEBUG_MSG("Futex does not exist; Abort requeue");
 		return 0;
 	}
@@ -399,7 +254,6 @@ futex_requeue(uint64_t *uaddr, uint64_t n, uint64_t *uaddr2, uint64_t m,
 	// }
 
 	__sync_synchronize();
-	current = f->sleep_queue_head;
 	// uint64_t val2 = __atomic_load_n(uaddr, __ATOMIC_SEQ_CST); 
 	// if ((current == NULL) ) {
 	// 	printf("Empty queue!\n");
@@ -408,19 +262,17 @@ futex_requeue(uint64_t *uaddr, uint64_t n, uint64_t *uaddr2, uint64_t m,
 	// }
 	DEBUG_MSG("Waking threads...");
 	struct wait_node* head = NULL; 
-	while ((NULL != f->sleep_queue_head) /*&& (count < (n + m))*/) {
-		head = pop_wait_node(f);
+	for (pthread_descr descr = pop_waiter(f); 0 != descr; descr = pop_waiter(f)) {
 		if (1/*count < n*/) {
 			// printf("count=%d\n", count);
 			// printf("Pointer of current %p\n", current);
-			pthread_descr thread = head->thr; 
 			// printf("Derefed, tID=%llu\n", thread);
 			// next = current->next;
 			// printf("Pointer of next %p\n", next);
 			DEBUG_MSG("Remove node");
 			// printf("Wake...%lu\n", thread);
 			__sync_synchronize();
-			restart(thread);
+			restart(descr);
 			__sync_synchronize();
 			// printf("Did restart...%lu\n", thread);
 
@@ -430,8 +282,8 @@ futex_requeue(uint64_t *uaddr, uint64_t n, uint64_t *uaddr2, uint64_t m,
 			// }
 		} else if (uaddr2 != NULL) {
 			DEBUG_MSG("Requeue to other futex");
-			add_futex_node(&global_futex_list, &g, uaddr2);
-			add_wait_node(g, current->thr);
+			register_futex(uaddr2, &g);
+			register_waiter(g, descr);
 		}
 		// current = next;
 		++count;
