@@ -26,12 +26,24 @@
 #include "spinlock.h"
 #include "queue.h"
 #include "restart.h"
+#include <time.h>
+#include <l4/util/rdtsc.h>
+
+inline void attribute_hidden ____save_time_stamp(enum pt_tracing_timestamp_type type) {
+  pthread_descr self = thread_self();
+
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  struct tracing_times tt = {type, l4_tsc_to_ns(l4_rdtsc())};
+  pt_tracing_write_tracing_time(&tt, self);
+}
 
 int
 attribute_hidden
 __pthread_mutex_init(pthread_mutex_t * mutex,
                        const pthread_mutexattr_t * mutex_attr)
-{
+{ 
+  ____save_time_stamp(PT_TRACING_INIT);
   __pthread_init_lock(&mutex->__m_lock);
   mutex->__m_kind =
     mutex_attr == NULL ? PTHREAD_MUTEX_TIMED_NP : mutex_attr->__mutexkind;
@@ -45,6 +57,7 @@ int
 attribute_hidden
 __pthread_mutex_destroy(pthread_mutex_t * mutex)
 {
+  ____save_time_stamp(PT_TRACING_DESTROY);
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
   case PTHREAD_MUTEX_RECURSIVE_NP:
@@ -68,6 +81,8 @@ __pthread_mutex_trylock(pthread_mutex_t * mutex)
 {
   pthread_descr self;
   int retcode;
+
+  ____save_time_stamp(PT_TRACING_TRYLOCK);
 
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
@@ -105,6 +120,7 @@ attribute_hidden
 __pthread_mutex_lock(pthread_mutex_t * mutex)
 {
   pthread_descr self;
+  ____save_time_stamp(PT_TRACING_LOCK);
 
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
@@ -145,6 +161,7 @@ __pthread_mutex_timedlock (pthread_mutex_t *mutex,
   pthread_descr self;
   int res;
 
+  ____save_time_stamp(PT_TRACING_TIMED_LOCK);
   if (__builtin_expect (abstime->tv_nsec, 0) < 0
       || __builtin_expect (abstime->tv_nsec, 0) >= 1000000000)
     return EINVAL;
@@ -186,7 +203,8 @@ strong_alias (__pthread_mutex_timedlock, pthread_mutex_timedlock)
 int
 attribute_hidden
 __pthread_mutex_unlock(pthread_mutex_t * mutex)
-{
+{  
+  ____save_time_stamp(PT_TRACING_UNLOCK);
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
     __pthread_unlock(&mutex->__m_lock);

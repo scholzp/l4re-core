@@ -696,4 +696,27 @@ extern int pthread_getaffinity_np (pthread_t __th, size_t __cpusetsize,
 
 __END_DECLS
 
+enum pt_tracing_timestamp_type {
+   PT_TRACING_INIT = 1,
+   PT_TRACING_CREATE,
+   PT_TRACING_LOCK,
+   PT_TRACING_TIMED_LOCK,
+   PT_TRACING_TRYLOCK,
+   PT_TRACING_UNLOCK,
+   PT_TRACING_DESTROY,
+};
+
+struct tracing_times {
+  enum pt_tracing_timestamp_type type;
+  unsigned long long time_stamp;
+};
+
+#define PTHREAD_TRACING_TIME_BUFFER_SIZE (1024 * 3)
+#define PTHREAD_MAX_NUM_OF_THREADS 32
+
+extern struct tracing_times pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE * PTHREAD_MAX_NUM_OF_THREADS];
+extern size_t pt_next_buffer_index;
+
+extern size_t __pthread_get_buff_id(void);
+
 #endif	/* pthread.h */
