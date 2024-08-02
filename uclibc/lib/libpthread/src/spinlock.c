@@ -62,18 +62,24 @@ void __pthread_release(int * spinlock)
 void internal_function __pthread_lock(struct _pthread_fastlock * lock,
 				      pthread_descr self)
 {
-  {
-    __pthread_acquire(&lock->__spinlock);
-    return;
-  }
+          uint64_t c; 
+        	if ((c = __sync_val_compare_and_swap(&lock->__status, 0, 1)) != 0) {
+        		do {
+        			if (c == 2 || __sync_val_compare_and_swap(&lock->__status, 1, 2) != 0) {
+        				futex_wait(&lock->__status, 2, NULL, 0);
+        			}
+        		} while ((c = __sync_val_compare_and_swap(&lock->__status, 0, 2)) != 0);
+        	}
 }
 
 int __pthread_unlock(struct _pthread_fastlock * lock)
 {
-  {
-    __pthread_release(&lock->__spinlock);
-    return 0;
-  }
+             	if (__sync_sub_and_fetch(&lock->__status, 1) != 0) {
+                // We *really* don't want to miss any wait queue entries...
+		        lock->__status = 0;
+                __sync_synchronize();
+		        futex_wake(&lock->__status, 1, 0);
+        	}
 }
 
 /*
