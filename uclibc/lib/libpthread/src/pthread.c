@@ -1571,6 +1571,9 @@ unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME = 0;
 unsigned long long PTHREAD_RESTART_TIME = 0;
 unsigned long long PTHREAD_LOCK_CALLS[4];
 unsigned long long PTHREAD_UNLOCK_CALLS[4];
+unsigned long long PTHREAD_RESTARTS = 0;
+unsigned long long PTHREAD_SLEEP_CALLS = 0;
+unsigned long long PTHREAD_TIMED_SUSPEND = 0;
 
 
 // int __attribute__((visibility("default"))) pt_tracing_get_index(_pthread_descr desc) {

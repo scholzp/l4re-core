@@ -19,22 +19,26 @@
 
 #include <l4/sys/types.h>
 #include <l4/sys/semaphore.h>
+#include <pthread.h>
 
 /* Primitives for controlling thread execution */
 
 static __inline__ void restart(pthread_descr th)
 {
+  ++PTHREAD_RESTARTS;
   l4_semaphore_up(th->p_thsem_cap);
 }
 
 static __inline__ void suspend(pthread_descr self)
 {
+  ++PTHREAD_SLEEP_CALLS;
   l4_semaphore_down(self->p_thsem_cap, L4_IPC_NEVER);
 }
 
 static __inline__ int timedsuspend(pthread_descr self,
 		const struct timespec *abstime)
 {
+  ++PTHREAD_TIMED_SUSPEND;
   extern uint64_t __attribute__((weak)) __libc_l4_kclock_offset;
   uint64_t clock = abstime->tv_sec * 1000000ULL + abstime->tv_nsec / 1000;
   if (&__libc_l4_kclock_offset)

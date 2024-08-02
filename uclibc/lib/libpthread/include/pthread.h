@@ -725,5 +725,8 @@ extern unsigned long long PTHREAD_LOOP_RETRIES;
 extern unsigned long long PTHREAD_ALTLOCK_TIME;
 extern unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
 extern unsigned long long PTHREAD_RESTART_TIME;
+extern unsigned long long PTHREAD_RESTARTS;
+extern unsigned long long PTHREAD_TIMED_SUSPEND;
+extern unsigned long long PTHREAD_SLEEP_CALLS;
 
 #endif	/* pthread.h */
