@@ -23,6 +23,7 @@
 #include "internals.h"
 #include "spinlock.h"
 #include "restart.h"
+#include <l4/util/rdtsc.h>
 
 
 static void __pthread_acquire(int * spinlock);
@@ -368,6 +369,7 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
   long oldstatus, newstatus;
 #endif
   struct wait_node wait_node;
+  unsigned long long tsc = l4_rdtsc();
 
 #if defined TEST_FOR_COMPARE_AND_SWAP
   if (!__pthread_has_cas)
@@ -392,6 +394,7 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
 
     __pthread_release(&lock->__spinlock);
 
+    PTHREAD_ALTLOCK_TIME += (l4_rdtsc() - tsc);
     if (suspend_needed)
       suspend (self);
     return;
@@ -421,6 +424,7 @@ void __pthread_alt_lock(struct _pthread_fastlock * lock,
      used in situations where that can happen; the restart can
      only come from the previous lock owner. */
 
+  PTHREAD_ALTLOCK_TIME += (l4_rdtsc() - tsc);
   if (oldstatus != 0)
     suspend(self);
 
@@ -523,7 +527,7 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
   struct wait_node *p_node, **pp_node, *p_max_prio, **pp_max_prio;
   struct wait_node ** const pp_head = (struct wait_node **) &lock->__status;
   int maxprio;
-
+  unsigned long long queue_tsc = 0, restart_tsc = 0;
   WRITE_MEMORY_BARRIER();
 
 #if defined TEST_FOR_COMPARE_AND_SWAP
@@ -536,6 +540,7 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
 #endif
 
   while (1) {
+    queue_tsc = l4_rdtsc();
 
   /* If no threads are waiting for this lock, try to just
      atomically release it. */
@@ -546,6 +551,7 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
     {
       if (lock->__status == 0 || lock->__status == 1) {
 	lock->__status = 0;
+  PTHREAD_QUEUE_TRAVERSE_TIME += (l4_rdtsc() - queue_tsc);
 	break;
       }
     }
@@ -559,8 +565,10 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
     {
       long oldstatus = lock->__status;
       if (oldstatus == 0 || oldstatus == 1) {
-	if (__compare_and_swap_with_release_semantics (&lock->__status, oldstatus, 0))
+	if (__compare_and_swap_with_release_semantics (&lock->__status, oldstatus, 0)) {
+    PTHREAD_QUEUE_TRAVERSE_TIME += (l4_rdtsc() - queue_tsc);
 	  break;
+  }
 	else
 	  continue;
       }
@@ -653,8 +661,10 @@ void __pthread_alt_unlock(struct _pthread_fastlock *lock)
 	}
 #endif
 
+      PTHREAD_QUEUE_TRAVERSE_TIME += (l4_rdtsc() - queue_tsc);
+      restart_tsc = l4_rdtsc();
       restart(p_max_prio->thr);
-
+      PTHREAD_RESTART_TIME += (l4_rdtsc() - restart_tsc);
       return;
     }
   }

@@ -718,5 +718,12 @@ extern struct tracing_times pt_tracing_buffer[PTHREAD_TRACING_TIME_BUFFER_SIZE *
 extern size_t pt_next_buffer_index;
 
 extern size_t __pthread_get_buff_id(void);
+extern unsigned long long PTHREAD_LOOP_CYCLES;
+extern unsigned long long PTHREAD_LOCK_CALLS[4];
+extern unsigned long long PTHREAD_UNLOCK_CALLS[4];
+extern unsigned long long PTHREAD_LOOP_RETRIES;
+extern unsigned long long PTHREAD_ALTLOCK_TIME;
+extern unsigned long long PTHREAD_QUEUE_TRAVERSE_TIME;
+extern unsigned long long PTHREAD_RESTART_TIME;
 
 #endif	/* pthread.h */

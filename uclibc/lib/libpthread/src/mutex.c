@@ -31,10 +31,7 @@
 
 inline void attribute_hidden ____save_time_stamp(enum pt_tracing_timestamp_type type) {
   pthread_descr self = thread_self();
-
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  struct tracing_times tt = {type, l4_tsc_to_ns(l4_rdtsc())};
+  struct tracing_times tt = {type, l4_rdtsc()};
   pt_tracing_write_tracing_time(&tt, self);
 }
 
@@ -81,14 +78,16 @@ __pthread_mutex_trylock(pthread_mutex_t * mutex)
 {
   pthread_descr self;
   int retcode;
-
+  
   ____save_time_stamp(PT_TRACING_TRYLOCK);
 
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     retcode = __pthread_trylock(&mutex->__m_lock);
     return retcode;
   case PTHREAD_MUTEX_RECURSIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     self = thread_self();
     if (mutex->__m_owner == self) {
       mutex->__m_count++;
@@ -101,12 +100,14 @@ __pthread_mutex_trylock(pthread_mutex_t * mutex)
     }
     return retcode;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     retcode = __pthread_alt_trylock(&mutex->__m_lock);
     if (retcode == 0) {
       mutex->__m_owner = thread_self();
     }
     return retcode;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     retcode = __pthread_alt_trylock(&mutex->__m_lock);
     return retcode;
   default:
@@ -124,9 +125,11 @@ __pthread_mutex_lock(pthread_mutex_t * mutex)
 
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     __pthread_lock(&mutex->__m_lock, NULL);
     return 0;
   case PTHREAD_MUTEX_RECURSIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
     self = thread_self();
     if (mutex->__m_owner == self) {
       mutex->__m_count++;
@@ -137,12 +140,14 @@ __pthread_mutex_lock(pthread_mutex_t * mutex)
     mutex->__m_count = 0;
     return 0;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     self = thread_self();
     if (mutex->__m_owner == self) return EDEADLK;
     __pthread_alt_lock(&mutex->__m_lock, self);
     mutex->__m_owner = self;
     return 0;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     __pthread_alt_lock(&mutex->__m_lock, NULL);
     return 0;
   default:
@@ -168,9 +173,11 @@ __pthread_mutex_timedlock (pthread_mutex_t *mutex,
 
   switch(mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     __pthread_lock(&mutex->__m_lock, NULL);
     return 0;
   case PTHREAD_MUTEX_RECURSIVE_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
     self = thread_self();
     if (mutex->__m_owner == self) {
       mutex->__m_count++;
@@ -181,6 +188,7 @@ __pthread_mutex_timedlock (pthread_mutex_t *mutex,
     mutex->__m_count = 0;
     return 0;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     self = thread_self();
     if (mutex->__m_owner == self) return EDEADLK;
     res = __pthread_alt_timedlock(&mutex->__m_lock, self, abstime);
@@ -191,6 +199,7 @@ __pthread_mutex_timedlock (pthread_mutex_t *mutex,
       }
     return ETIMEDOUT;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_LOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     /* Only this type supports timed out lock. */
     return (__pthread_alt_timedlock(&mutex->__m_lock, NULL, abstime)
 	    ? 0 : ETIMEDOUT);
@@ -207,9 +216,11 @@ __pthread_mutex_unlock(pthread_mutex_t * mutex)
   ____save_time_stamp(PT_TRACING_UNLOCK);
   switch (mutex->__m_kind) {
   case PTHREAD_MUTEX_ADAPTIVE_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ADAPTIVE_NP];
     __pthread_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_RECURSIVE_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_RECURSIVE_NP];
     if (mutex->__m_owner != thread_self())
       return EPERM;
     if (mutex->__m_count > 0) {
@@ -220,12 +231,14 @@ __pthread_mutex_unlock(pthread_mutex_t * mutex)
     __pthread_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_ERRORCHECK_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_ERRORCHECK_NP];
     if (mutex->__m_owner != thread_self() || mutex->__m_lock.__status == 0)
       return EPERM;
     mutex->__m_owner = NULL;
     __pthread_alt_unlock(&mutex->__m_lock);
     return 0;
   case PTHREAD_MUTEX_TIMED_NP:
+    ++PTHREAD_UNLOCK_CALLS[PTHREAD_MUTEX_TIMED_NP];
     __pthread_alt_unlock(&mutex->__m_lock);
     return 0;
   default:
