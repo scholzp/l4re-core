@@ -22,7 +22,7 @@
 #include "globals.h"
 
 enum {
-  Heap_max = L4_PAGESIZE * 64,
+  Heap_max = L4_PAGESIZE * 1024 * 2,
 };
 
 extern char __executable_start[];

@@ -39,6 +39,8 @@
 #include <errno.h>
 #include <sys/uio.h>
 
+#include <atomic>
+
 #if 0
 #include <l4/sys/kdebug.h>
 static int debug_mmap = 1;
@@ -97,7 +99,7 @@ public:
 class Vfs : public L4Re::Vfs::Ops
 {
 private:
-  bool _early_oom;
+  std::atomic<bool> _early_oom;
 
 public:
   Vfs()
@@ -176,8 +178,13 @@ private:
 
   cxx::H_list_t<File_factory_item> _file_factories;
 
-  l4_addr_t _anon_offset;
+  /*
+   * Shared dataspace for allocating small portions of anon memory, both
+   * variables are protected by the _anon_lock spinlock.
+   */
+  l4_addr_t                         _anon_offset;
   L4Re::Shared_cap<L4Re::Dataspace> _anon_ds;
+  std::atomic<unsigned char>        _anon_lock{0};  // 0 = unlocked, 1 = locked
 
   int alloc_ds(unsigned long size, L4Re::Shared_cap<L4Re::Dataspace> *ds);
   int alloc_anon_mem(l4_umword_t size, L4Re::Shared_cap<L4Re::Dataspace> *ds,
@@ -558,6 +565,8 @@ Vfs::alloc_anon_mem(l4_umword_t size, L4Re::Shared_cap<L4Re::Dataspace> *ds,
   };
 #endif
 
+  // If the requested size of the anon ds exceeds the size of the shared pool,
+  // a separate DS is allocated right away.
   if (size >= ANON_MEM_MAX_SIZE)
     {
       int err;
@@ -572,11 +581,20 @@ Vfs::alloc_anon_mem(l4_umword_t size, L4Re::Shared_cap<L4Re::Dataspace> *ds,
       return (*ds)->allocate(0, size);
     }
 
+  // We use a makeshift spinlock to protect the shared dataspace for serving
+  // small allocations of anonymous memory. Do not forget the unlock operations!
+  unsigned char unlocked = 0;
+  while (_anon_lock.compare_exchange_strong(unlocked, 1) == false)
+    unlocked = 0;
+
   if (!_anon_ds.is_valid() || _anon_offset + size >= ANON_MEM_DS_POOL_SIZE)
     {
       int err;
       if ((err = alloc_ds(ANON_MEM_DS_POOL_SIZE, ds)) < 0)
-        return err;
+        {
+          _anon_lock = 0;
+          return err;
+        }
 
       _anon_offset = 0;
       _anon_ds = *ds;
@@ -587,11 +605,17 @@ Vfs::alloc_anon_mem(l4_umword_t size, L4Re::Shared_cap<L4Re::Dataspace> *ds,
   if (_early_oom)
     {
       if (int err = (*ds)->allocate(_anon_offset, size))
-        return err;
+        {
+          _anon_lock = 0;
+          return err;
+        }
     }
 
   *offset = _anon_offset;
   _anon_offset += size;
+
+  _anon_lock = 0;
+
   return 0;
 }
 

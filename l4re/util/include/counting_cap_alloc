@@ -34,7 +34,7 @@ namespace L4Re { namespace Util {
  *
  * This version is not thread safe.
  */
-template< typename COUNTER = unsigned char >
+template< typename COUNTER = unsigned long long>
 struct Counter
 {
   typedef COUNTER Type;
@@ -105,7 +105,7 @@ struct Counter
  * then, after the slot was unmapped, will the counter be set to 0. This will
  * allow other threads to reallocate the slot.
  */
-template< typename COUNTER = unsigned char >
+template< typename COUNTER = unsigned long long >
 struct Counter_atomic
 {
   typedef COUNTER Type;
@@ -307,8 +307,8 @@ public:
       return;
 
     if (!L4_UNLIKELY(_items[c].inc()))
-      _dbg->printf("Warning: Reference counter of cap 0x%lx now saturated!\n",
-                   cap.cap() >> L4_CAP_SHIFT);
+      _dbg->printf("Warning: Reference counter of cap 0x%lx now saturated with %u!\n",
+                   cap.cap() >> L4_CAP_SHIFT), _items[c]._cnt;
   }
 
 

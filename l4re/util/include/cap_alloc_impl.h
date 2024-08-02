@@ -45,7 +45,7 @@ namespace L4Re { namespace Util {
 // The RISC-V gcc developers have decided to emulate these via libatomic, which
 // is automatically linked against.
 #if defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_1) || defined(ARCH_arm) || defined(ARCH_riscv)
-typedef Counting_cap_alloc<L4Re::Util::Counter_atomic<unsigned char>,
+typedef Counting_cap_alloc<L4Re::Util::Counter_atomic<unsigned long>,
                            L4Re::Util::Dbg > _Cap_alloc;
 #elif defined(ARCH_sparc)
 typedef Counting_cap_alloc<L4Re::Util::Counter<unsigned char>,
