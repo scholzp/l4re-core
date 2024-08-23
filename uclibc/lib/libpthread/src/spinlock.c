@@ -62,24 +62,24 @@ void __pthread_release(int * spinlock)
 void internal_function __pthread_lock(struct _pthread_fastlock * lock,
 				      pthread_descr self)
 {
-          uint64_t c; 
-        	if ((c = __sync_val_compare_and_swap(&lock->__status, 0, 1)) != 0) {
-        		do {
-        			if (c == 2 || __sync_val_compare_and_swap(&lock->__status, 1, 2) != 0) {
-        				futex_wait(&lock->__status, 2, NULL, 0);
-        			}
-        		} while ((c = __sync_val_compare_and_swap(&lock->__status, 0, 2)) != 0);
-        	}
+  uint64_t c; 
+  if ((c = __sync_val_compare_and_swap(&lock->__status, 0, 1)) != 0) {
+    do {
+      if (c == 2 || __sync_val_compare_and_swap(&lock->__status, 1, 2) != 0) {
+        futex_wait(&lock->__status, 2, NULL, 0);
+      }
+    } while ((c = __sync_val_compare_and_swap(&lock->__status, 0, 2)) != 0);
+  }
 }
 
 int __pthread_unlock(struct _pthread_fastlock * lock)
 {
-             	if (__sync_sub_and_fetch(&lock->__status, 1) != 0) {
-                // We *really* don't want to miss any wait queue entries...
-		        lock->__status = 0;
-                __sync_synchronize();
-		        futex_wake(&lock->__status, 1, 0);
-        	}
+  if (__sync_sub_and_fetch(&lock->__status, 1) != 0) {
+    // We *really* don't want to miss any wait queue entries...
+    lock->__status = 0;
+    __sync_synchronize();
+    futex_wake(&lock->__status, 1, 0);
+  }
 }
 
 /*
@@ -146,53 +146,14 @@ static void wait_node_pt_free(struct wait_node_pt *wn)
 void __pthread_alt_lock(struct _pthread_fastlock * lock,
 		        pthread_descr self)
 {
-  // struct wait_node_pt wait_node_pt;
-  // {
-  //   int suspend_needed = 0;
-  //   __pthread_acquire(&lock->__spinlock);
-
-  //   if (lock->__status == 0)
-  //     lock->__status = 1;
-  //   else {
-  //     if (self == NULL)
-	//     self = thread_self();
-
-  //     wait_node_pt.abandoned = 0;
-  //     wait_node_pt.next = (struct wait_node_pt *) lock->__status;
-  //     wait_node_pt.thr = self;
-  //     lock->__status = (long) &wait_node_pt;
-  //     suspend_needed = 1;
-  //   }
-
-  //   __pthread_release(&lock->__spinlock);
-  //   if (suspend_needed){
-  //     suspend (self);
-  //   }
-  //   // __pthread_lock(lock, self);
-  //   return;
-  // }
-  // int val = __atomic_sub_fetch(&lock->__status, 1, __ATOMIC_SEQ_CST);
-  // // Fast path
-  //     // printf("Value %d\n", val);
-  // if (-1 == val) {
-  //   return;
-  // } else {
-  //   // Spin until we either sleep or access the fast path
-  //   while (1 != futex_wait(&lock->__status, val, NULL, 0)) {
-  //     val = __atomic_sub_fetch(&lock->__status, 1, __ATOMIC_SEQ_CST);
-  //     // if we can access the fast path, simply return
-  //     if (-1 == val)
-  //       return; 
-  //   }
-  // }
-            uint64_t c; 
-        	if ((c = __sync_val_compare_and_swap(&lock->__status, 0, 1)) != 0) {
-        		do {
-        			if (c == 2 || __sync_val_compare_and_swap(&lock->__status, 1, 2) != 0) {
-        				futex_wait(&lock->__status, 2, NULL, 0);
-        			}
-        		} while ((c = __sync_val_compare_and_swap(&lock->__status, 0, 2)) != 0);
-        	}
+  uint64_t c; 
+  if ((c = __sync_val_compare_and_swap(&lock->__status, 0, 1)) != 0) {
+    do {
+      if (c == 2 || __sync_val_compare_and_swap(&lock->__status, 1, 2) != 0) {
+        futex_wait(&lock->__status, 2, NULL, 0);
+      }
+    } while ((c = __sync_val_compare_and_swap(&lock->__status, 0, 2)) != 0);
+  }
 }
 
 /* Timed-out lock operation; returns 0 to indicate timeout. */
@@ -287,92 +248,12 @@ int __pthread_alt_timedlock(struct _pthread_fastlock * lock,
 
 void __pthread_alt_unlock(struct _pthread_fastlock *lock)
 {
-  // __pthread_unlock(lock);
-  // struct wait_node_pt *p_node, **pp_node, *p_max_prio, **pp_max_prio;
-  // struct wait_node_pt ** const pp_head = (struct wait_node_pt **) &lock->__status;
-  // int maxprio;
-
-  // unsigned long long retires = 0;
-  // unsigned long long cycles = 0; 
-
-  // WRITE_MEMORY_BARRIER();
-
-  // __pthread_acquire(&lock->__spinlock);
-  // while (1) {
-  // /* If no threads are waiting for this lock, try to just
-  //    atomically release it. */
-  //   {
-  //     if (lock->__status == 0 || lock->__status == 1) {
-	//       lock->__status = 0;
-	//       break;
-  //     }
-  //   }
-  //   /* Process the entire queue of wait nodes. Remove all abandoned
-  //      wait nodes and put them into the global free queue, and
-  //      remember the one unabandoned node which refers to the thread
-  //      having the highest priority. */
-
-  //   pp_max_prio = pp_node = pp_head;
-  //   p_max_prio = p_node = *pp_head;
-  //   maxprio = INT_MIN;
-
-  //   READ_MEMORY_BARRIER(); /* Prevent access to stale data through p_node */
-  //   while (p_node != (struct wait_node_pt *) 1) {
-  //     ++cycles;
-  //     int prio;
-  //     if (p_node->abandoned) {
-  //   	  *pp_node = p_node->next;
-  //     	// wait_node_pt_free(p_node);
-  //       /* Note that the next assignment may take us to the beginning
-  //       of the queue, to newly inserted nodes, if pp_node == pp_head.
-  //       In that case we need a memory barrier to stabilize the first of
-  //       these new nodes. */
-  //       p_node = *pp_node;
-	//       if (pp_node == pp_head)
-	//         // READ_MEMORY_BARRIER(); /* No stale reads through p_node */
-	//       continue;
-  //     } else if (p_node->thr->p_priority >= maxprio) {
-  //         prio = p_node->thr->p_priority;
-  //         maxprio = prio;
-  //         pp_max_prio = pp_node;
-  //         p_max_prio = p_node;
-  //       /* Otherwise remember it if its thread has a higher or equal priority
-  //         compared to that of any node seen thus far. */
-  //     }
-  //     /* This canno6 jump backward in the list, so no further read
-  //        barrier is needed. */
-  //     pp_node = &p_node->next;
-  //     p_node = *pp_node;
-  //   }
-
-  //   /* If all threads abandoned, go back to top */
-  //   if (maxprio == INT_MIN)
-  //     continue;
-
-  //   /* Now we want to to remove the max priority thread's wait node from
-  //      the list. Before we can do this, we must atomically try to change the
-  //      node's abandon state from zero to nonzero. If we succeed, that means we
-  //      have the node that we will wake up. If we failed, then it means the
-  //      thread timed out and abandoned the node in which case we repeat the
-  //      whole unlock operation. */
-
-  //   if (!testandset(&p_max_prio->abandoned)/*(p_max_prio->abandoned)*/) {
-  //   	*pp_max_prio = p_max_prio->next;
-  //     /* Release the spinlock *before* restarting.  */
-	//     __pthread_release(&lock->__spinlock);
-  //     restart(p_max_prio->thr);
-  //     // l4_usleep(1);
-  //     return;
-  //   }
-  //   ++retires;
-  // }
-  // __pthread_release(&lock->__spinlock);
-             	if (__sync_sub_and_fetch(&lock->__status, 1) != 0) {
-                // We *really* don't want to miss any wait queue entries...
-		        lock->__status = 0;
-                __sync_synchronize();
-		        futex_wake(&lock->__status, 1, 0);
-        	}
+  if (__sync_sub_and_fetch(&lock->__status, 1) != 0) {
+    // We *really* don't want to miss any wait queue entries...
+    lock->__status = 0;
+        __sync_synchronize();
+    futex_wake(&lock->__status, 1, 0);
+  }
 }
 
 
@@ -437,20 +318,4 @@ void __pthread_acquire(int * spinlock)
       cnt = 0;
     }
   }
-// while (!__sync_bool_compare_and_swap(spinlock, 0, 1)) while (*spinlock){
-//     __builtin_ia32_pause();
-// }
-//   while (1) {
-//     if ((*spinlock) == __LT_SPINLOCK_INIT) {
-//       if (!testandset(spinlock))
-//         break;
-//     }
-//     if (cnt < MAX_SPIN_COUNT) {
-//       l4_thread_yield();
-//       cnt++;
-//     } else {
-//       l4_usleep(SPIN_SLEEP_DURATION / 1000);
-//       cnt = 0;
-//     }
-//   }
 }
